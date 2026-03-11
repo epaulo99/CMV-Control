@@ -29,7 +29,14 @@ const oauthClient = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-const sheets = google.sheets({ version: "v4", auth: oauthClient });
+const serviceAuth = new google.auth.GoogleAuth({
+  credentials: process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+    : undefined,
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
+
+const sheets = google.sheets({ version: "v4", auth: serviceAuth });
 
 const SHEETS = {
   users: { title: "usuarios", columns: ["id", "email", "name", "role", "status", "refresh_token", "created_at", "last_login"] },
@@ -87,7 +94,13 @@ let lastOAuthCallback = null;
 let lastOAuthError = null;
 
 function assertEnv() {
-  const required = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI", "SPREADSHEET_ID"];
+  const required = [
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GOOGLE_REDIRECT_URI",
+    "SPREADSHEET_ID",
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+  ];
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length) {
     const error = new Error(`Missing env: ${missing.join(", ")}`);
@@ -208,15 +221,6 @@ function requireSession(req, res, next) {
   return next();
 }
 
-function setCredentialsFromSession(req, res, next) {
-  const tokens = req.session?.tokens;
-  if (!tokens?.access_token && !tokens?.refresh_token) {
-    return res.status(403).json({ ok: false, message: "Token OAuth ausente. Refaça o login." });
-  }
-  oauthClient.setCredentials(tokens);
-  return next();
-}
-
 async function requireApproved(req, res, next) {
   const user = await findUserByEmail(req.session.email);
   if (!user || user.status !== "approved") {
@@ -252,8 +256,8 @@ app.get("/debug/session", (req, res) => {
     ok: true,
     hasSession: Boolean(req.session),
     email: req.session?.email || null,
-    hasAccessToken: Boolean(req.session?.tokens?.access_token),
-    hasRefreshToken: Boolean(req.session?.tokens?.refresh_token),
+    hasAccessToken: false,
+    hasRefreshToken: false,
   });
 });
 
@@ -324,7 +328,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
       name,
       role: existing?.role || (adminExists ? "viewer" : "admin"),
       status: existing?.status || (adminExists ? "pending" : "approved"),
-      refresh_token: tokens.refresh_token || existing?.refresh_token || "",
+      refresh_token: existing?.refresh_token || "",
       created_at: existing?.created_at || now,
       last_login: now,
     };
@@ -332,11 +336,6 @@ app.get("/auth/google/callback", async (req, res, next) => {
     await upsertUser(userRecord);
 
     req.session.email = email;
-    req.session.tokens = {
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token || existing?.refresh_token || "",
-      expiry_date: tokens.expiry_date,
-    };
     res.redirect(frontendOrigin);
   } catch (error) {
     lastOAuthError = {
@@ -353,7 +352,7 @@ app.post("/auth/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/me", requireSession, setCredentialsFromSession, async (req, res) => {
+app.get("/me", requireSession, async (req, res) => {
   const user = await findUserByEmail(req.session.email);
   if (!user) return res.status(404).json({ ok: false, message: "Usuario nao encontrado" });
   if (user.status !== "approved") {
@@ -362,7 +361,7 @@ app.get("/me", requireSession, setCredentialsFromSession, async (req, res) => {
   res.json({ ok: true, user: { email: user.email, name: user.name, role: user.role, status: user.status } });
 });
 
-app.get("/admin/users", requireSession, setCredentialsFromSession, await requireRole("admin"), async (_req, res) => {
+app.get("/admin/users", requireSession, await requireRole("admin"), async (_req, res) => {
   const values = await getSheetValues(SHEETS.users.title);
   const users = rowsToObjects(values).map((user) => ({
     id: user.id,
@@ -376,7 +375,7 @@ app.get("/admin/users", requireSession, setCredentialsFromSession, await require
   res.json({ ok: true, users });
 });
 
-app.patch("/admin/users/:id", requireSession, setCredentialsFromSession, await requireRole("admin"), async (req, res) => {
+app.patch("/admin/users/:id", requireSession, await requireRole("admin"), async (req, res) => {
   const values = await getSheetValues(SHEETS.users.title);
   const users = rowsToObjects(values);
   const target = users.find((user) => user.id === req.params.id);
@@ -392,13 +391,13 @@ app.patch("/admin/users/:id", requireSession, setCredentialsFromSession, await r
   res.json({ ok: true });
 });
 
-app.get("/data/cmv/weekly", requireSession, setCredentialsFromSession, requireApproved, async (_req, res) => {
+app.get("/data/cmv/weekly", requireSession, requireApproved, async (_req, res) => {
   const values = await getSheetValues(SHEETS.cmvWeekly.title);
   const data = rowsToObjects(values);
   res.json({ ok: true, data });
 });
 
-app.post("/data/cmv/weekly", requireSession, setCredentialsFromSession, await requireRole("collaborator"), async (req, res) => {
+app.post("/data/cmv/weekly", requireSession, await requireRole("collaborator"), async (req, res) => {
   const payload = req.body;
   const record = {
     id: payload.id || crypto.randomUUID(),
@@ -419,13 +418,13 @@ app.post("/data/cmv/weekly", requireSession, setCredentialsFromSession, await re
   res.json({ ok: true, record });
 });
 
-app.get("/data/cmv/monthly", requireSession, setCredentialsFromSession, requireApproved, async (_req, res) => {
+app.get("/data/cmv/monthly", requireSession, requireApproved, async (_req, res) => {
   const values = await getSheetValues(SHEETS.cmvMonthly.title);
   const data = rowsToObjects(values);
   res.json({ ok: true, data });
 });
 
-app.post("/data/cmv/monthly", requireSession, setCredentialsFromSession, await requireRole("collaborator"), async (req, res) => {
+app.post("/data/cmv/monthly", requireSession, await requireRole("collaborator"), async (req, res) => {
   const payload = req.body;
   const record = {
     id: payload.id || crypto.randomUUID(),
@@ -446,13 +445,13 @@ app.post("/data/cmv/monthly", requireSession, setCredentialsFromSession, await r
   res.json({ ok: true, record });
 });
 
-app.get("/data/refeitorio/monthly", requireSession, setCredentialsFromSession, requireApproved, async (_req, res) => {
+app.get("/data/refeitorio/monthly", requireSession, requireApproved, async (_req, res) => {
   const values = await getSheetValues(SHEETS.refMonthly.title);
   const data = rowsToObjects(values);
   res.json({ ok: true, data });
 });
 
-app.post("/data/refeitorio/monthly", requireSession, setCredentialsFromSession, await requireRole("collaborator"), async (req, res) => {
+app.post("/data/refeitorio/monthly", requireSession, await requireRole("collaborator"), async (req, res) => {
   const payload = req.body;
   const record = {
     id: payload.id || crypto.randomUUID(),
@@ -475,13 +474,13 @@ app.post("/data/refeitorio/monthly", requireSession, setCredentialsFromSession, 
   res.json({ ok: true, record });
 });
 
-app.get("/data/refeitorio/daily", requireSession, setCredentialsFromSession, requireApproved, async (_req, res) => {
+app.get("/data/refeitorio/daily", requireSession, requireApproved, async (_req, res) => {
   const values = await getSheetValues(SHEETS.refDaily.title);
   const data = rowsToObjects(values);
   res.json({ ok: true, data });
 });
 
-app.post("/data/refeitorio/daily", requireSession, setCredentialsFromSession, await requireRole("collaborator"), async (req, res) => {
+app.post("/data/refeitorio/daily", requireSession, await requireRole("collaborator"), async (req, res) => {
   const payload = req.body;
   const records = payload.records || [];
   for (const item of records) {
