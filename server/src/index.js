@@ -9,7 +9,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5174;
 const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const isProd = frontendOrigin.startsWith("https://");
 
+app.set("trust proxy", 1);
 app.use(cors({ origin: frontendOrigin, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(
@@ -17,8 +19,8 @@ app.use(
     name: "cmv_session",
     keys: [process.env.SESSION_SECRET || "dev-secret"],
     httpOnly: true,
-    sameSite: "lax",
-    secure: false,
+    sameSite: isProd ? "none" : "lax",
+    secure: isProd,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   })
 );
