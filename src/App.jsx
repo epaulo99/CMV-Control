@@ -356,6 +356,10 @@ function App() {
   };
 
   if (currentScreen === "landing") {
+    if (currentUser) {
+      setCurrentScreen("dashboard");
+      return null;
+    }
     return <LandingView onLogin={() => (window.location.href = `${API_BASE}/auth/google/login`)} />;
   }
 
