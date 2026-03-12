@@ -492,6 +492,17 @@ function App() {
           )}
         </main>
       </div>
+      <footer className="mx-auto mt-6 flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+        <span>CMV Control</span>
+        <div className="flex gap-4">
+          <a className="hover:text-brand-700" href="/privacy.html" target="_blank" rel="noreferrer">
+            Politica de Privacidade
+          </a>
+          <a className="hover:text-brand-700" href="/terms.html" target="_blank" rel="noreferrer">
+            Termos de Servico
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
