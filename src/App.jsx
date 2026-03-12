@@ -568,8 +568,22 @@ function AuthView({ status, message, onLogin, onRetry }) {
 }
 
 function LandingView({ onLogin }) {
+  const weeklyData = [
+    { label: "S1", value: 34 },
+    { label: "S2", value: 32 },
+    { label: "S3", value: 36 },
+    { label: "S4", value: 33 },
+  ];
+
+  const monthlyData = [
+    { label: "Out", value: 38 },
+    { label: "Nov", value: 35 },
+    { label: "Dez", value: 34 },
+    { label: "Jan", value: 33 },
+  ];
+
   return (
-    <div className="flex min-h-screen flex-col justify-between bg-white">
+    <div className="flex min-h-screen flex-col justify-between bg-gradient-to-br from-white via-slate-50 to-brand-50">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <div>
           <h1 className="text-2xl font-semibold text-ink">CMV Control</h1>
@@ -588,9 +602,16 @@ function LandingView({ onLogin }) {
         <div className="card-surface p-8">
           <h2 className="text-3xl font-semibold text-ink">Controle completo de CMV e Refeitorio</h2>
           <p className="mt-3 max-w-2xl text-sm text-slate-600">
-            Acompanhe indicadores semanais e mensais, gere relatorios e tenha rastreabilidade de cada registro.
+            Acompanhe indicadores semanais e mensais, gere relatorios e tenha rastreabilidade de cada registro com uma interface clara.
           </p>
           <div className="mt-6 flex flex-wrap gap-4">
+            <button
+              type="button"
+              onClick={onLogin}
+              className="rounded-xl bg-brand-600 px-5 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            >
+              Entrar com Google
+            </button>
             <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/privacy.html" target="_blank" rel="noreferrer">
               Politica de Privacidade
             </a>
@@ -599,6 +620,66 @@ function LandingView({ onLogin }) {
             </a>
           </div>
         </div>
+
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="card-surface p-5">
+            <p className="text-xs uppercase text-slate-500">CMV mensal medio</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+          </div>
+          <div className="card-surface p-5">
+            <p className="text-xs uppercase text-slate-500">Compras %</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+          </div>
+          <div className="card-surface p-5">
+            <p className="text-xs uppercase text-slate-500">Perdas mapeadas</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+          </div>
+          <div className="card-surface p-5">
+            <p className="text-xs uppercase text-slate-500">Refeicoes mes</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <ChartCard title="Tendencia CMV semanal">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+                <XAxis dataKey="label" />
+                <YAxis domain={[0, 50]} unit="%" />
+                <Tooltip formatter={(value) => `${value}%`} />
+                <Line type="monotone" dataKey="value" stroke="#1793A5" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard title="Tendencia CMV mensal">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+                <XAxis dataKey="label" />
+                <YAxis domain={[0, 50]} unit="%" />
+                <Tooltip formatter={(value) => `${value}%`} />
+                <Bar dataKey="value" fill="#F6A740" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </section>
+
+        <section className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="card-surface p-5">
+            <h3 className="text-base font-semibold text-ink">Governanca</h3>
+            <p className="mt-2 text-sm text-slate-600">Aprovacao de usuarios, perfis e controle por setor.</p>
+          </div>
+          <div className="card-surface p-5">
+            <h3 className="text-base font-semibold text-ink">Relatorios</h3>
+            <p className="mt-2 text-sm text-slate-600">Relatorios por restaurante e refeitório com PDF.</p>
+          </div>
+          <div className="card-surface p-5">
+            <h3 className="text-base font-semibold text-ink">Rastreabilidade</h3>
+            <p className="mt-2 text-sm text-slate-600">Cada registro com autor e historico para auditoria.</p>
+          </div>
+        </section>
       </main>
 
       <footer className="mx-auto w-full max-w-6xl px-6 py-6 text-xs text-slate-500">
