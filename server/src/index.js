@@ -9,6 +9,7 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5174;
 const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const frontendRedirect = process.env.FRONTEND_REDIRECT || frontendOrigin;
 const isProd = frontendOrigin.startsWith("https://");
 
 app.set("trust proxy", 1);
@@ -338,7 +339,7 @@ app.get("/auth/google/callback", async (req, res, next) => {
     await upsertUser(userRecord);
 
     req.session.email = email;
-    res.redirect(frontendOrigin);
+    res.redirect(frontendRedirect);
   } catch (error) {
     lastOAuthError = {
       time: new Date().toISOString(),
