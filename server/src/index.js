@@ -8,12 +8,23 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5174;
-const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const rawOrigins = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const frontendOrigins = rawOrigins.split(",").map((value) => value.trim()).filter(Boolean);
+const frontendOrigin = frontendOrigins[0] || "http://localhost:5173";
 const frontendRedirect = process.env.FRONTEND_REDIRECT || frontendOrigin;
-const isProd = frontendOrigin.startsWith("https://");
+const isProd = frontendOrigins.some((origin) => origin.startsWith("https://"));
 
 app.set("trust proxy", 1);
-app.use(cors({ origin: frontendOrigin, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (frontendOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Origem nao permitida"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 app.use(
   cookieSession({
