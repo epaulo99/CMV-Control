@@ -49,19 +49,21 @@ const NAV_ITEMS = [
 ];
 
 const SCREEN_PATHS = {
-  dashboard: "/",
-  weekly: "/cmv-semanal",
-  monthly: "/cmv-mensal",
-  reports: "/relatorios",
-  reportRestaurant: "/relatorios/restaurante",
-  reportRefeitorio: "/relatorios/refeitorio",
-  refeitorio: "/refeitorio",
-  admin: "/admin",
+  landing: "/",
+  dashboard: "/app",
+  weekly: "/app/cmv-semanal",
+  monthly: "/app/cmv-mensal",
+  reports: "/app/relatorios",
+  reportRestaurant: "/app/relatorios/restaurante",
+  reportRefeitorio: "/app/relatorios/refeitorio",
+  refeitorio: "/app/refeitorio",
+  admin: "/app/admin",
 };
 
 function getScreenFromPath(pathname) {
+  if (pathname === "/") return "landing";
   const match = Object.entries(SCREEN_PATHS).find(([, path]) => path === pathname);
-  return match?.[0] ?? "dashboard";
+  return match?.[0] ?? "landing";
 }
 
 function isScreenAllowedForRole(role, screen) {
@@ -163,6 +165,10 @@ function App() {
 
   useEffect(() => {
     if (!currentUser) return;
+    if (currentScreen === "landing") {
+      setCurrentScreen("dashboard");
+      return;
+    }
     const allowed = isScreenAllowedForRole(currentUser.role, currentScreen);
     if (!allowed) {
       setCurrentScreen(currentUser.role === "admin" ? "admin" : "dashboard");
@@ -348,6 +354,10 @@ function App() {
       setCurrentScreen("dashboard");
     });
   };
+
+  if (currentScreen === "landing") {
+    return <LandingView onLogin={() => (window.location.href = `${API_BASE}/auth/google/login`)} />;
+  }
 
   if (!currentUser || currentUser.status !== "approved") {
     return (
@@ -553,6 +563,47 @@ function AuthView({ status, message, onLogin, onRetry }) {
         )}
         <p className="mt-4 text-center text-xs text-slate-500">Desenvolvido por Eliabe Paulo.</p>
       </div>
+    </div>
+  );
+}
+
+function LandingView({ onLogin }) {
+  return (
+    <div className="flex min-h-screen flex-col justify-between bg-white">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-ink">CMV Control</h1>
+          <p className="text-sm text-slate-500">Painel de Controle do restaurante</p>
+        </div>
+        <button
+          type="button"
+          onClick={onLogin}
+          className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        >
+          Entrar com Google
+        </button>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl px-6 pb-10 pt-4">
+        <div className="card-surface p-8">
+          <h2 className="text-3xl font-semibold text-ink">Controle completo de CMV e Refeitorio</h2>
+          <p className="mt-3 max-w-2xl text-sm text-slate-600">
+            Acompanhe indicadores semanais e mensais, gere relatorios e tenha rastreabilidade de cada registro.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-4">
+            <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/privacy.html" target="_blank" rel="noreferrer">
+              Politica de Privacidade
+            </a>
+            <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/terms.html" target="_blank" rel="noreferrer">
+              Termos de Servico
+            </a>
+          </div>
+        </div>
+      </main>
+
+      <footer className="mx-auto w-full max-w-6xl px-6 py-6 text-xs text-slate-500">
+        Desenvolvido por Eliabe Paulo.
+      </footer>
     </div>
   );
 }
