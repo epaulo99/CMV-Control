@@ -20,7 +20,7 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (frontendOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Origem nao permitida"));
+      return callback(new Error("Origem não permitida"));
     },
     credentials: true,
   })
@@ -230,7 +230,7 @@ function hasAdmin(users) {
 
 function requireSession(req, res, next) {
   if (!req.session?.email) {
-    return res.status(401).json({ ok: false, message: "Nao autenticado" });
+    return res.status(401).json({ ok: false, message: "Não autenticado" });
   }
   return next();
 }
@@ -238,7 +238,7 @@ function requireSession(req, res, next) {
 async function requireApproved(req, res, next) {
   const user = await findUserByEmail(req.session.email);
   if (!user || user.status !== "approved") {
-    return res.status(403).json({ ok: false, message: "Acesso nao aprovado" });
+    return res.status(403).json({ ok: false, message: "Acesso não aprovado" });
   }
   req.currentUser = user;
   return next();
@@ -248,7 +248,7 @@ async function requireRole(role) {
   return async (req, res, next) => {
     const user = await findUserByEmail(req.session.email);
     if (!user || user.status !== "approved") {
-      return res.status(403).json({ ok: false, message: "Acesso nao aprovado" });
+      return res.status(403).json({ ok: false, message: "Acesso não aprovado" });
     }
     if (role === "admin" && user.role !== "admin") {
       return res.status(403).json({ ok: false, message: "Acesso restrito" });
@@ -368,7 +368,7 @@ app.post("/auth/logout", (req, res) => {
 
 app.get("/me", requireSession, async (req, res) => {
   const user = await findUserByEmail(req.session.email);
-  if (!user) return res.status(404).json({ ok: false, message: "Usuario nao encontrado" });
+  if (!user) return res.status(404).json({ ok: false, message: "Usuário não encontrado" });
   if (user.status !== "approved") {
     return res.json({ ok: true, user: { email: user.email, name: user.name, role: user.role, status: user.status } });
   }
@@ -393,7 +393,7 @@ app.patch("/admin/users/:id", requireSession, await requireRole("admin"), async 
   const values = await getSheetValues(SHEETS.users.title);
   const users = rowsToObjects(values);
   const target = users.find((user) => user.id === req.params.id);
-  if (!target) return res.status(404).json({ ok: false, message: "Usuario nao encontrado" });
+  if (!target) return res.status(404).json({ ok: false, message: "Usuário não encontrado" });
 
   const updates = {
     ...target,

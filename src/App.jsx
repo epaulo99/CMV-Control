@@ -44,8 +44,8 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "weekly", label: "CMV Semanal", icon: Calendar },
   { id: "monthly", label: "CMV Mensal", icon: BarChart3 },
-  { id: "reports", label: "Relatorios", icon: Receipt },
-  { id: "refeitorio", label: "Refeitorio", icon: Users },
+  { id: "reports", label: "Relatórios", icon: Receipt },
+  { id: "refeitorio", label: "Refeitório", icon: Users },
 ];
 
 const SCREEN_PATHS = {
@@ -92,7 +92,7 @@ const baseEntry = {
 const MONTH_OPTIONS = [
   { value: 1, label: "Janeiro" },
   { value: 2, label: "Fevereiro" },
-  { value: 3, label: "Marco" },
+  { value: 3, label: "Março" },
   { value: 4, label: "Abril" },
   { value: 5, label: "Maio" },
   { value: 6, label: "Junho" },
@@ -197,7 +197,7 @@ function App() {
     const insights = [];
 
     if ((latestWeek?.cmvPercent ?? 0) > 40 || (latestMonth?.cmvPercent ?? 0) > 40) {
-      insights.push("Alerta: CMV acima do ideal. Verifique desperdicios ou aumento de custos.");
+      insights.push("Alerta: CMV acima do ideal. Verifique desperdícios ou aumento de custos.");
     }
 
     if ((latestWeek?.purchasesPercent ?? 0) > 45 || (latestMonth?.purchasesPercent ?? 0) > 45) {
@@ -375,7 +375,7 @@ function App() {
   }
 
   const visibleNavItems = currentUser.role === "admin"
-    ? [{ id: "admin", label: "Aprovacoes", icon: ShieldCheck }]
+    ? [{ id: "admin", label: "Aprovações", icon: ShieldCheck }]
     : NAV_ITEMS.filter((item) => {
         if (currentUser.role === "viewer") {
           return ["dashboard", "reports", "refeitorio"].includes(item.id);
@@ -464,7 +464,7 @@ function App() {
           {currentScreen === "monthly" && currentUser.role !== "viewer" && (
             <EntryView
               title="CMV Mensal"
-              subtitle="Registre os dados do mes para consolidar o acompanhamento financeiro do CMV."
+              subtitle="Registre os dados do mês para consolidar o acompanhamento financeiro do CMV."
               formState={monthlyForm}
               setFormState={setMonthlyForm}
               referenceType="month"
@@ -510,10 +510,10 @@ function App() {
         <span>CMV Control</span>
         <div className="flex gap-4">
           <a className="hover:text-brand-700" href="/privacy.html" target="_blank" rel="noreferrer">
-            Politica de Privacidade
+            Política de Privacidade
           </a>
           <a className="hover:text-brand-700" href="/terms.html" target="_blank" rel="noreferrer">
-            Termos de Servico
+            Termos de Serviço
           </a>
         </div>
       </footer>
@@ -524,7 +524,7 @@ function App() {
 function AuthView({ status, message, onLogin, onRetry }) {
   const renderStatus = () => {
     if (status === "pending") {
-      return "Conta pendente de aprovacao do administrador.";
+      return "Conta pendente de aprovação do administrador.";
     }
     if (status === "rejected") {
       return "Conta reprovada pelo administrador.";
@@ -533,7 +533,7 @@ function AuthView({ status, message, onLogin, onRetry }) {
       return "Acesso revogado pelo administrador.";
     }
     if (status === "loading") {
-      return "Verificando sessao...";
+      return "Verificando sessão...";
     }
     return "";
   };
@@ -604,9 +604,9 @@ function LandingView({ onLogin }) {
 
       <main className="mx-auto w-full max-w-6xl px-6 pb-10 pt-4">
         <div className="card-surface p-8">
-          <h2 className="text-3xl font-semibold text-ink">Controle completo de CMV e Refeitorio</h2>
+          <h2 className="text-3xl font-semibold text-ink">Controle completo de CMV e Refeitório</h2>
           <p className="mt-3 max-w-2xl text-sm text-slate-600">
-            Acompanhe indicadores semanais e mensais, gere relatorios e tenha rastreabilidade de cada registro com uma interface clara.
+            Acompanhe indicadores semanais e mensais, gere relatórios e tenha rastreabilidade de cada registro com uma interface clara.
           </p>
           <div className="mt-6 flex flex-wrap gap-4">
             <button
@@ -617,10 +617,10 @@ function LandingView({ onLogin }) {
               Entrar com Google
             </button>
             <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/privacy.html" target="_blank" rel="noreferrer">
-              Politica de Privacidade
+              Política de Privacidade
             </a>
             <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" href="/terms.html" target="_blank" rel="noreferrer">
-              Termos de Servico
+              Termos de Serviço
             </a>
           </div>
         </div>
@@ -628,24 +628,24 @@ function LandingView({ onLogin }) {
         <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className="card-surface p-5">
             <p className="text-xs uppercase text-slate-500">CMV mensal medio</p>
-            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponível</p>
           </div>
           <div className="card-surface p-5">
             <p className="text-xs uppercase text-slate-500">Compras %</p>
-            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponível</p>
           </div>
           <div className="card-surface p-5">
             <p className="text-xs uppercase text-slate-500">Perdas mapeadas</p>
-            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponível</p>
           </div>
           <div className="card-surface p-5">
-            <p className="text-xs uppercase text-slate-500">Refeicoes mes</p>
-            <p className="mt-2 text-base font-semibold text-ink">Indicador disponivel</p>
+            <p className="text-xs uppercase text-slate-500">Refeições mês</p>
+            <p className="mt-2 text-base font-semibold text-ink">Indicador disponível</p>
           </div>
         </section>
 
         <section className="mt-6 grid gap-4 xl:grid-cols-2">
-          <ChartCard title="Tendencia CMV semanal">
+          <ChartCard title="Tendência CMV semanal">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -657,7 +657,7 @@ function LandingView({ onLogin }) {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Tendencia CMV mensal">
+          <ChartCard title="Tendência CMV mensal">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -672,16 +672,16 @@ function LandingView({ onLogin }) {
 
         <section className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="card-surface p-5">
-            <h3 className="text-base font-semibold text-ink">Governanca</h3>
-            <p className="mt-2 text-sm text-slate-600">Aprovacao de usuarios, perfis e controle por setor.</p>
+            <h3 className="text-base font-semibold text-ink">Governança</h3>
+            <p className="mt-2 text-sm text-slate-600">Aprovação de usuários, perfis e controle por setor.</p>
           </div>
           <div className="card-surface p-5">
-            <h3 className="text-base font-semibold text-ink">Relatorios</h3>
-            <p className="mt-2 text-sm text-slate-600">Relatorios por restaurante e refeitório com PDF.</p>
+            <h3 className="text-base font-semibold text-ink">Relatórios</h3>
+            <p className="mt-2 text-sm text-slate-600">Relatórios por restaurante e refeitório com PDF.</p>
           </div>
           <div className="card-surface p-5">
             <h3 className="text-base font-semibold text-ink">Rastreabilidade</h3>
-            <p className="mt-2 text-sm text-slate-600">Cada registro com autor e historico para auditoria.</p>
+            <p className="mt-2 text-sm text-slate-600">Cada registro com autor e histórico para auditoria.</p>
           </div>
         </section>
       </main>
@@ -745,7 +745,7 @@ function AdminView() {
       <section className="card-surface p-5">
         <h3 className="text-lg font-semibold text-ink">Solicitacoes pendentes</h3>
         <div className="mt-4 space-y-3">
-          {loading && <p className="text-sm text-slate-500">Carregando usuarios...</p>}
+          {loading && <p className="text-sm text-slate-500">Carregando usuários...</p>}
           {!loading && pendingUsers.length === 0 && <p className="text-sm text-slate-500">Nenhuma solicitacao pendente.</p>}
           {pendingUsers.map((user) => (
             <div key={user.id} className="rounded-xl border border-slate-200 p-4">
@@ -753,7 +753,7 @@ function AdminView() {
               <p className="text-xs text-slate-500">{user.email}</p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 <label className="text-sm text-slate-600">
-                  Tipo de usuario
+                  Tipo de usuário
                   <select
                     value={approvalRoles[user.id] || "viewer"}
                     onChange={(event) => setApprovalRoles((current) => ({ ...current, [user.id]: event.target.value }))}
@@ -784,12 +784,12 @@ function AdminView() {
       </section>
 
       <section className="card-surface p-5">
-        <h3 className="text-lg font-semibold text-ink">Usuarios gerenciados</h3>
+        <h3 className="text-lg font-semibold text-ink">Usuários gerenciados</h3>
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-4 py-3 text-left">Usuario</th>
+                <th className="px-4 py-3 text-left">Usuário</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Perfil</th>
                 <th className="px-4 py-3 text-left">Acoes</th>
@@ -838,7 +838,7 @@ function AdminView() {
               {!loading && managedUsers.length === 0 && (
                 <tr>
                   <td className="px-4 py-4 text-slate-500" colSpan={4}>
-                    Nenhum usuario para gerenciar.
+                    Nenhum usuário para gerenciar.
                   </td>
                 </tr>
               )}
@@ -877,14 +877,14 @@ function DashboardView({
           trend={monthTrend}
         />
         <KpiCard
-          title="Faturamento do Mes"
+          title="Faturamento do Mês"
           value={formatCurrency(latestMonth?.faturamento ?? 0)}
           percent={formatPercent(latestMonth?.cmvPercent ?? 0)}
           icon={Wallet}
           trend={monthTrend}
         />
         <KpiCard
-          title="Compras do Mes"
+          title="Compras do Mês"
           value={formatCurrency(latestMonth?.compras ?? 0)}
           percent={formatPercent(latestMonth?.purchasesPercent ?? 0)}
           icon={ShoppingCart}
@@ -936,10 +936,10 @@ function DashboardView({
         <HealthCard title="Perdas Semana" value={formatCurrency(latestWeek?.perdas ?? 0)} health={latestWeek?.health} />
 
         <div className="card-surface p-4 lg:col-span-4">
-          <p className="text-sm text-slate-500">Indicador de saude</p>
+          <p className="text-sm text-slate-500">Indicador de saúde</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <StatusBadge label={`Semana: ${weekHealth?.label ?? "Sem dados"}`} health={weekHealth} />
-            <StatusBadge label={`Mes: ${monthHealth?.label ?? "Sem dados"}`} health={monthHealth} />
+            <StatusBadge label={`Mês: ${monthHealth?.label ?? "Sem dados"}`} health={monthHealth} />
           </div>
         </div>
       </section>
@@ -1034,7 +1034,7 @@ function EntryView({
 
         <form className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={submit}>
           <InputField
-            label={referenceType === "week" ? "Semana de referencia" : "Mes de referencia"}
+            label={referenceType === "week" ? "Semana de referência" : "Mês de referência"}
             type={inputType}
             value={formState.reference}
             onChange={(value) => setFormState((current) => ({ ...current, reference: value }))}
@@ -1073,7 +1073,7 @@ function EntryView({
             required
           />
           <InputField
-            label="Perdas ou desperdicios"
+            label="Perdas ou desperdícios"
             value={formState.perdas}
             onChange={(value) => setFormState((current) => ({ ...current, perdas: value }))}
             type="number"
@@ -1111,7 +1111,7 @@ function EntryView({
 
       <section className="card-surface overflow-hidden">
         <div className="border-b border-slate-200 px-5 py-4">
-          <h3 className="text-lg font-semibold text-ink">Historico</h3>
+          <h3 className="text-lg font-semibold text-ink">Histórico</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -1173,10 +1173,10 @@ function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
         onClick={openRestaurantReport}
         className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
       >
-        <p className="text-sm uppercase tracking-wide text-brand-700">Relatorios</p>
-        <h3 className="mt-2 text-2xl font-semibold text-ink">Relatorio Restaurante</h3>
+        <p className="text-sm uppercase tracking-wide text-brand-700">Relatórios</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">Relatório Restaurante</h3>
         <p className="mt-2 text-sm text-slate-500">
-          KPIs, analise de CMV, comparativos e historico semanal/mensal com exportacao PDF.
+          KPIs, análise de CMV, comparativos e histórico semanal/mensal com exportação em PDF.
         </p>
       </button>
 
@@ -1185,10 +1185,10 @@ function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
         onClick={openRefeitorioReport}
         className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
       >
-        <p className="text-sm uppercase tracking-wide text-brand-700">Relatorios</p>
-        <h3 className="mt-2 text-2xl font-semibold text-ink">Relatorio Refeitorio</h3>
+        <p className="text-sm uppercase tracking-wide text-brand-700">Relatórios</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">Relatório Refeitório</h3>
         <p className="mt-2 text-sm text-slate-500">
-          Custos por refeicao, totais mensais, refeicoes diarias e exportacao em PDF.
+          Custos por refeição, totais mensais, refeições diárias e exportação em PDF.
         </p>
       </button>
     </section>
@@ -1257,8 +1257,8 @@ function ReportsView({
       <section className="card-surface p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-ink">Relatorio Restaurante</h2>
-            <p className="mt-1 text-sm text-slate-500">Indicadores e historico do setor restaurante.</p>
+            <h2 className="text-xl font-semibold text-ink">Relatório Restaurante</h2>
+            <p className="mt-1 text-sm text-slate-500">Indicadores e histórico do setor restaurante.</p>
           </div>
           <button
             type="button"
@@ -1323,7 +1323,7 @@ function ReportsView({
       <ReportRecordsTable title="Registros mensais detalhados" records={monthlyRecords} />
 
       <div className="fixed -left-[99999px] top-0 w-[1180px] bg-white p-8 text-black" ref={printRef}>
-        <h1 className="text-2xl font-semibold">Relatorio CMV</h1>
+        <h1 className="text-2xl font-semibold">Relatório CMV</h1>
         <p className="mt-1 text-sm">Data de emissao: {new Date().toLocaleDateString("pt-BR")}</p>
 
         <section className="mt-6 grid grid-cols-2 gap-4">
@@ -1386,7 +1386,7 @@ function ReportsView({
         </section>
 
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
-          <h2 className="text-base font-semibold">Registros do mes</h2>
+          <h2 className="text-base font-semibold">Registros do mês</h2>
           <ReportRecordsStaticTable records={monthlyRecords} />
         </section>
       </div>
@@ -1506,8 +1506,8 @@ function RefeitorioReportView({ onBack }) {
       <section className="card-surface p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-ink">Relatorio Refeitorio</h2>
-            <p className="mt-1 text-sm text-slate-500">Resumo mensal e evolucao diaria de custo/refeicoes.</p>
+            <h2 className="text-xl font-semibold text-ink">Relatório Refeitório</h2>
+            <p className="mt-1 text-sm text-slate-500">Resumo mensal e evolução diária de custo/refeições.</p>
           </div>
           <button
             type="button"
@@ -1520,7 +1520,7 @@ function RefeitorioReportView({ onBack }) {
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <label className="text-sm text-slate-600">
-            Mes
+            Mês
             <select
               value={filtro.mes}
               onChange={(event) => setFiltro((current) => ({ ...current, mes: toNumber(event.target.value) }))}
@@ -1576,16 +1576,16 @@ function RefeitorioReportView({ onBack }) {
       <div className="space-y-4" ref={reportRef}>
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <RefeitorioStatCard title="Custo por colaborador" value={formatCurrency(custoPorRefeicao)} badge={costStatus} />
-          <RefeitorioStatCard title="Total de refeicoes" value={String(totalRefeicoes)} />
-          <RefeitorioStatCard title="Custo total do refeitorio" value={formatCurrency(custoTotal)} />
-          <RefeitorioStatCard title="Compras do mes" value={formatCurrency(comprasMes)} />
+          <RefeitorioStatCard title="Total de refeições" value={String(totalRefeicoes)} />
+          <RefeitorioStatCard title="Custo total do refeitório" value={formatCurrency(custoTotal)} />
+          <RefeitorioStatCard title="Compras do mês" value={formatCurrency(comprasMes)} />
         </section>
         <p className="text-sm text-slate-500">
           Registro mensal inserido por: <strong>{registroMensal?.created_by ?? "-"}</strong>
         </p>
 
         <section className="grid gap-4 xl:grid-cols-2">
-          <ChartCard title="Refeicoes servidas por dia">
+          <ChartCard title="Refeições servidas por dia">
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={dailyChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -1597,7 +1597,7 @@ function RefeitorioReportView({ onBack }) {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Tendencia de custo ao longo do mes">
+          <ChartCard title="Tendência de custo ao longo do mês">
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -1613,7 +1613,7 @@ function RefeitorioReportView({ onBack }) {
         <section className="card-surface overflow-hidden">
           <div className="border-b border-slate-200 px-5 py-4">
             <h3 className="text-lg font-semibold text-ink">
-              Refeicoes diarias - {String(periodo.mes).padStart(2, "0")}/{periodo.ano}
+              Refeições diárias - {String(periodo.mes).padStart(2, "0")}/{periodo.ano}
             </h3>
           </div>
           <div className="max-h-[420px] overflow-y-auto">
@@ -1621,7 +1621,7 @@ function RefeitorioReportView({ onBack }) {
               <thead className="sticky top-0 bg-slate-50 text-slate-600">
                 <tr>
                   <th className="px-4 py-3 text-left">Data</th>
-                  <th className="px-4 py-3 text-left">Refeicoes servidas</th>
+                  <th className="px-4 py-3 text-left">Refeições servidas</th>
                   <th className="px-4 py-3 text-left">Registrado por</th>
                 </tr>
               </thead>
@@ -1908,12 +1908,12 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
   return (
     <div className="space-y-4">
       <section className="card-surface p-5">
-        <h2 className="text-xl font-semibold text-ink">Refeitorio</h2>
-        <p className="mt-1 text-sm text-slate-500">Custo mensal da refeicao por colaborador.</p>
+        <h2 className="text-xl font-semibold text-ink">Refeitório</h2>
+        <p className="mt-1 text-sm text-slate-500">Custo mensal da refeição por colaborador.</p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-4">
           <label className="text-sm text-slate-600">
-            Mes
+            Mês
             <select
               value={filtro.mes}
               onChange={(event) => setFiltro((current) => ({ ...current, mes: toNumber(event.target.value) }))}
@@ -1956,13 +1956,13 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <RefeitorioStatCard title="Custo por colaborador" value={formatCurrency(custoPorRefeicao)} badge={costStatus} />
-        <RefeitorioStatCard title="Total de refeicoes" value={String(totalRefeicoesMes)} />
-        <RefeitorioStatCard title="Custo total do refeitorio" value={formatCurrency(custoTotalRefeitorio)} />
-        <RefeitorioStatCard title="Compras do mes" value={formatCurrency(formData.comprasMes)} />
+        <RefeitorioStatCard title="Total de refeições" value={String(totalRefeicoesMes)} />
+        <RefeitorioStatCard title="Custo total do refeitório" value={formatCurrency(custoTotalRefeitorio)} />
+        <RefeitorioStatCard title="Compras do mês" value={formatCurrency(formData.comprasMes)} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Refeicoes servidas por dia">
+        <ChartCard title="Refeições servidas por dia">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={dailyChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -1974,7 +1974,7 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Tendencia de custo ao longo do mes">
+        <ChartCard title="Tendência de custo ao longo do mês">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={barCostTrendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -1996,8 +1996,8 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                 onClick={() => setIsFormOpen((current) => !current)}
                 className="flex w-full items-center justify-between text-left"
               >
-                <h3 className="text-lg font-semibold text-ink">Insercao de dados</h3>
-                <span className="text-sm font-medium text-brand-700">{isFormOpen ? "Ocultar" : "Incluir informacoes"}</span>
+                <h3 className="text-lg font-semibold text-ink">Inserção de dados</h3>
+                <span className="text-sm font-medium text-brand-700">{isFormOpen ? "Ocultar" : "Incluir informações"}</span>
               </button>
             </div>
             {isFormOpen ? (
@@ -2012,7 +2012,7 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                     required
                   />
                   <InputField
-                    label="Compras do mes"
+                    label="Compras do mês"
                     type="number"
                     step="0.01"
                     value={formData.comprasMes}
@@ -2032,14 +2032,14 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                       type="submit"
                       className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700"
                     >
-                      Calcular custo do refeitorio
+                      Calcular custo do refeitório
                     </button>
                   </div>
                 </form>
                 {mensagem && <p className="mt-3 text-sm text-emerald-700">{mensagem}</p>}
               </div>
             ) : (
-              <p className="px-5 py-4 text-sm text-slate-500">Secao retraida. Clique em \"Incluir informacoes\" para abrir.</p>
+              <p className="px-5 py-4 text-sm text-slate-500">Seção retraída. Clique em \"Incluir informações\" para abrir.</p>
             )}
           </section>
 
@@ -2050,8 +2050,8 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                 onClick={() => setIsMealsTableOpen((current) => !current)}
                 className="flex w-full items-center justify-between text-left"
               >
-                <h3 className="text-lg font-semibold text-ink">Tabela de refeicoes diarias</h3>
-                <span className="text-sm font-medium text-brand-700">{isMealsTableOpen ? "Ocultar" : "Incluir informacoes"}</span>
+                <h3 className="text-lg font-semibold text-ink">Tabela de refeições diárias</h3>
+                <span className="text-sm font-medium text-brand-700">{isMealsTableOpen ? "Ocultar" : "Incluir informações"}</span>
               </button>
             </div>
             {isMealsTableOpen ? (
@@ -2061,7 +2061,7 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                     <thead className="sticky top-0 bg-slate-50 text-slate-600">
                       <tr>
                         <th className="px-4 py-3 text-left">Data</th>
-                        <th className="px-4 py-3 text-left">Refeicoes servidas</th>
+                        <th className="px-4 py-3 text-left">Refeições servidas</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2084,13 +2084,13 @@ function RefeitorioView({ canEdit = true, actorName = "Desconhecido" }) {
                 </div>
               </div>
             ) : (
-              <p className="px-5 py-4 text-sm text-slate-500">Secao retraida. Clique em \"Incluir informacoes\" para abrir.</p>
+              <p className="px-5 py-4 text-sm text-slate-500">Seção retraída. Clique em \"Incluir informações\" para abrir.</p>
             )}
           </section>
         </>
       ) : (
         <section className="card-surface p-5">
-          <p className="text-sm text-slate-500">Perfil visualizador: inclusao e edicao de dados do refeitorio estao bloqueadas.</p>
+          <p className="text-sm text-slate-500">Perfil visualizador: inclusão e edição de dados do refeitório estão bloqueadas.</p>
         </section>
       )}
 
@@ -2170,7 +2170,7 @@ function PreviewCard({ label, value }) {
 
 function Trend({ trend }) {
   if (!trend || trend.direction === "stable") {
-    return <span className="text-xs text-slate-500">Sem variacao</span>;
+    return <span className="text-xs text-slate-500">Sem variação</span>;
   }
 
   const isUp = trend.direction === "up";
@@ -2219,13 +2219,13 @@ function buildDailyMealRows(month, year, storedRows) {
 function getMealCostStatus(costPerMeal) {
   if (costPerMeal <= 18) {
     return {
-      label: "Custo Saudavel (ate R$18)",
+      label: "Custo saudável (até R$18)",
       className: "bg-emerald-100 text-emerald-700",
     };
   }
   if (costPerMeal <= 20) {
     return {
-      label: "Atencao (entre R$18 e R$20)",
+      label: "Atenção (entre R$18 e R$20)",
       className: "bg-amber-100 text-amber-700",
     };
   }
