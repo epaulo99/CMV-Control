@@ -80,6 +80,13 @@ function translateRole(role) {
   return "Colaborador";
 }
 
+function formatMonthReference(reference) {
+  if (!reference || !reference.includes("-")) return reference || "-";
+  const [year, month] = reference.split("-");
+  if (!year || !month) return reference;
+  return `${month}/${year}`;
+}
+
 const baseEntry = {
   reference: "",
   estoqueInicial: "",
@@ -112,6 +119,7 @@ function App() {
   const [monthlyEntries, setMonthlyEntries] = useState([]);
   const [monthlyForm, setMonthlyForm] = useState(baseEntry);
   const [editingMonthlyId, setEditingMonthlyId] = useState(null);
+  const [monthlyNotice, setMonthlyNotice] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const [authStatus, setAuthStatus] = useState("loading");
   const [authMessage, setAuthMessage] = useState("");
@@ -254,6 +262,28 @@ function App() {
     if (!monthlyForm.reference) return;
     const existing = editingMonthlyId ? monthlyEntries.find((item) => item.id === editingMonthlyId) : null;
     const categoryToSave = existing?.category || category;
+    const duplicated = monthlyEntries.find(
+      (item) =>
+        item.reference === monthlyForm.reference &&
+        (item.category || "geral") === categoryToSave &&
+        item.id !== editingMonthlyId
+    );
+
+    if (duplicated) {
+      setEditingMonthlyId(duplicated.id);
+      setMonthlyForm({
+        reference: duplicated.reference ?? "",
+        estoqueInicial: String(toNumber(duplicated.estoqueInicial)),
+        compras: String(toNumber(duplicated.compras)),
+        estoqueFinal: String(toNumber(duplicated.estoqueFinal)),
+        faturamento: String(toNumber(duplicated.faturamento)),
+        perdas: String(toNumber(duplicated.perdas)),
+      });
+      setMonthlyNotice(
+        `Já existe registro para ${formatMonthReference(duplicated.reference)}. Edite o mês já preenchido.`
+      );
+      return;
+    }
 
     const payload = {
       id: editingMonthlyId ?? crypto.randomUUID(),
@@ -271,10 +301,12 @@ function App() {
     saveMonthlyApi(payload).then(loadMonthly);
     setMonthlyForm(baseEntry);
     setEditingMonthlyId(null);
+    setMonthlyNotice("");
   };
 
   const startMonthlyEdit = (record) => {
     setEditingMonthlyId(record.id);
+    setMonthlyNotice("");
     setMonthlyForm({
       reference: record.reference ?? "",
       estoqueInicial: String(toNumber(record.estoqueInicial)),
@@ -288,11 +320,43 @@ function App() {
   const cancelMonthlyEdit = () => {
     setEditingMonthlyId(null);
     setMonthlyForm(baseEntry);
+    setMonthlyNotice("");
   };
 
   const saveMonthlyGeneral = (event) => saveMonthly(event, "geral");
   const saveMonthlyBeverages = (event) => saveMonthly(event, "bebidas");
   const saveMonthlyFoods = (event) => saveMonthly(event, "alimentos");
+
+  const handleMonthlyReferenceChange = (reference, category) => {
+    const match = monthlyEntries.find(
+      (item) => item.reference === reference && (item.category || "geral") === category
+    );
+
+    if (match) {
+      setEditingMonthlyId(match.id);
+      setMonthlyForm({
+        reference: match.reference ?? reference,
+        estoqueInicial: String(toNumber(match.estoqueInicial)),
+        compras: String(toNumber(match.compras)),
+        estoqueFinal: String(toNumber(match.estoqueFinal)),
+        faturamento: String(toNumber(match.faturamento)),
+        perdas: String(toNumber(match.perdas)),
+      });
+      setMonthlyNotice(`Registro encontrado para ${formatMonthReference(reference)}. Você pode editar os dados.`);
+      return;
+    }
+
+    setEditingMonthlyId(null);
+    setMonthlyNotice("");
+    setMonthlyForm({
+      reference,
+      estoqueInicial: "0",
+      compras: "0",
+      estoqueFinal: "0",
+      faturamento: "0",
+      perdas: "0",
+    });
+  };
 
   const logout = () => {
     fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" }).finally(() => {
@@ -396,19 +460,23 @@ function App() {
 
           {currentScreen === "monthly" && currentUser.role !== "viewer" && (
             <MonthlyCmvHubView
+              onBack={() => setCurrentScreen("dashboard")}
               openGeneral={() => {
                 setEditingMonthlyId(null);
                 setMonthlyForm(baseEntry);
+                setMonthlyNotice("");
                 setCurrentScreen("monthlyGeneral");
               }}
               openBeverages={() => {
                 setEditingMonthlyId(null);
                 setMonthlyForm(baseEntry);
+                setMonthlyNotice("");
                 setCurrentScreen("monthlyBeverages");
               }}
               openFoods={() => {
                 setEditingMonthlyId(null);
                 setMonthlyForm(baseEntry);
+                setMonthlyNotice("");
                 setCurrentScreen("monthlyFoods");
               }}
             />
@@ -418,12 +486,15 @@ function App() {
             <EntryView
               title="CMV Mensal - CMV Geral"
               subtitle="Registre o CMV mensal consolidado (alimentos e bebidas)."
+              onBack={() => setCurrentScreen("monthly")}
+              onReferenceChange={(reference) => handleMonthlyReferenceChange(reference, "geral")}
               formState={monthlyForm}
               setFormState={setMonthlyForm}
               referenceType="month"
               submit={saveMonthlyGeneral}
               records={monthlyGeneralRecords}
               isEditing={Boolean(editingMonthlyId)}
+              notice={monthlyNotice}
               onEditRecord={startMonthlyEdit}
               onCancelEdit={cancelMonthlyEdit}
             />
@@ -433,12 +504,15 @@ function App() {
             <EntryView
               title="CMV Mensal - Bebidas"
               subtitle="Registre apenas o CMV mensal de bebidas e vinhos."
+              onBack={() => setCurrentScreen("monthly")}
+              onReferenceChange={(reference) => handleMonthlyReferenceChange(reference, "bebidas")}
               formState={monthlyForm}
               setFormState={setMonthlyForm}
               referenceType="month"
               submit={saveMonthlyBeverages}
               records={monthlyBeveragesRecords}
               isEditing={Boolean(editingMonthlyId)}
+              notice={monthlyNotice}
               onEditRecord={startMonthlyEdit}
               onCancelEdit={cancelMonthlyEdit}
             />
@@ -448,12 +522,15 @@ function App() {
             <EntryView
               title="CMV Mensal - Alimentos"
               subtitle="Registre apenas o CMV mensal de alimentos."
+              onBack={() => setCurrentScreen("monthly")}
+              onReferenceChange={(reference) => handleMonthlyReferenceChange(reference, "alimentos")}
               formState={monthlyForm}
               setFormState={setMonthlyForm}
               referenceType="month"
               submit={saveMonthlyFoods}
               records={monthlyFoodsRecords}
               isEditing={Boolean(editingMonthlyId)}
+              notice={monthlyNotice}
               onEditRecord={startMonthlyEdit}
               onCancelEdit={cancelMonthlyEdit}
             />
@@ -927,6 +1004,8 @@ function DashboardView({
 function EntryView({
   title,
   subtitle,
+  onBack,
+  onReferenceChange,
   categoryTabs,
   formState,
   setFormState,
@@ -934,6 +1013,7 @@ function EntryView({
   submit,
   records,
   isEditing,
+  notice,
   onEditRecord,
   onCancelEdit,
 }) {
@@ -955,16 +1035,34 @@ function EntryView({
   return (
     <>
       <section className="card-surface p-5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Voltar
+        </button>
         <h2 className="text-xl font-semibold text-ink">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         {categoryTabs}
+        {notice && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {notice}
+          </div>
+        )}
 
         <form className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={submit}>
           <InputField
             label={referenceType === "week" ? "Semana de referência" : "Mês de referência"}
             type={inputType}
             value={formState.reference}
-            onChange={(value) => setFormState((current) => ({ ...current, reference: value }))}
+            onChange={(value) => {
+              if (onReferenceChange) {
+                onReferenceChange(value);
+                return;
+              }
+              setFormState((current) => ({ ...current, reference: value }));
+            }}
             required
           />
           <InputField
@@ -1092,9 +1190,18 @@ function EntryView({
   );
 }
 
-function MonthlyCmvHubView({ openGeneral, openBeverages, openFoods }) {
+function MonthlyCmvHubView({ onBack, openGeneral, openBeverages, openFoods }) {
   return (
-    <section className="grid gap-4 md:grid-cols-3">
+    <section className="space-y-4">
+      <button
+        type="button"
+        onClick={onBack}
+        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        Voltar
+      </button>
+
+      <div className="grid gap-4 md:grid-cols-3">
       <button
         type="button"
         onClick={openGeneral}
@@ -1124,6 +1231,7 @@ function MonthlyCmvHubView({ openGeneral, openBeverages, openFoods }) {
         <h3 className="mt-2 text-2xl font-semibold text-ink">CMV Alimentos</h3>
         <p className="mt-2 text-sm text-slate-500">Alimente apenas o CMV analítico de alimentos.</p>
       </button>
+      </div>
     </section>
   );
 }
