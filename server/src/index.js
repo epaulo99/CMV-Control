@@ -54,25 +54,12 @@ const sheets = google.sheets({ version: "v4", auth: serviceAuth });
 
 const SHEETS = {
   users: { title: "usuarios", columns: ["id", "email", "name", "role", "status", "refresh_token", "created_at", "last_login"] },
-  cmvWeekly: {
-    title: "cmv_semanal",
-    columns: [
-      "id",
-      "reference",
-      "estoque_inicial",
-      "compras",
-      "estoque_final",
-      "faturamento",
-      "perdas",
-      "created_by",
-      "created_at",
-    ],
-  },
   cmvMonthly: {
     title: "cmv_mensal",
     columns: [
       "id",
       "reference",
+      "category",
       "estoque_inicial",
       "compras",
       "estoque_final",
@@ -134,6 +121,29 @@ async function ensureSheetExists(sheetTitle, columns) {
         requests: [{ addSheet: { properties: { title: sheetTitle } } }],
       },
     });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetTitle}!A1:${String.fromCharCode(64 + columns.length)}1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [columns] },
+    });
+    return;
+  }
+
+  const values = await getSheetValues(sheetTitle);
+  if (!values.length) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${sheetTitle}!A1:${String.fromCharCode(64 + columns.length)}1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [columns] },
+    });
+    return;
+  }
+
+  const header = values[0];
+  const hasAllColumns = columns.every((column) => header.includes(column));
+  if (!hasAllColumns) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: `${sheetTitle}!A1:${String.fromCharCode(64 + columns.length)}1`,
@@ -405,33 +415,6 @@ app.patch("/admin/users/:id", requireSession, await requireRole("admin"), async 
   res.json({ ok: true });
 });
 
-app.get("/data/cmv/weekly", requireSession, requireApproved, async (_req, res) => {
-  const values = await getSheetValues(SHEETS.cmvWeekly.title);
-  const data = rowsToObjects(values);
-  res.json({ ok: true, data });
-});
-
-app.post("/data/cmv/weekly", requireSession, await requireRole("collaborator"), async (req, res) => {
-  const payload = req.body;
-  const record = {
-    id: payload.id || crypto.randomUUID(),
-    reference: payload.reference,
-    estoque_inicial: payload.estoque_inicial,
-    compras: payload.compras,
-    estoque_final: payload.estoque_final,
-    faturamento: payload.faturamento,
-    perdas: payload.perdas,
-    created_by: req.currentUser.email,
-    created_at: new Date().toISOString(),
-  };
-
-  const updated = await updateRowById(SHEETS.cmvWeekly.title, SHEETS.cmvWeekly.columns, record.id, record);
-  if (!updated) {
-    await appendRow(SHEETS.cmvWeekly.title, SHEETS.cmvWeekly.columns, record);
-  }
-  res.json({ ok: true, record });
-});
-
 app.get("/data/cmv/monthly", requireSession, requireApproved, async (_req, res) => {
   const values = await getSheetValues(SHEETS.cmvMonthly.title);
   const data = rowsToObjects(values);
@@ -443,6 +426,7 @@ app.post("/data/cmv/monthly", requireSession, await requireRole("collaborator"),
   const record = {
     id: payload.id || crypto.randomUUID(),
     reference: payload.reference,
+    category: payload.category || "geral",
     estoque_inicial: payload.estoque_inicial,
     compras: payload.compras,
     estoque_final: payload.estoque_final,

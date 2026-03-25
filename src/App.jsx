@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BarChart3,
-  Calendar,
   FileDown,
   LayoutDashboard,
   LogOut,
@@ -42,7 +41,6 @@ import {
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "weekly", label: "CMV Semanal", icon: Calendar },
   { id: "monthly", label: "CMV Mensal", icon: BarChart3 },
   { id: "reports", label: "Relatórios", icon: Receipt },
   { id: "refeitorio", label: "Refeitório", icon: Users },
@@ -51,8 +49,10 @@ const NAV_ITEMS = [
 const SCREEN_PATHS = {
   landing: "/",
   dashboard: "/app",
-  weekly: "/app/cmv-semanal",
   monthly: "/app/cmv-mensal",
+  monthlyGeneral: "/app/cmv-mensal/geral",
+  monthlyBeverages: "/app/cmv-mensal/bebidas",
+  monthlyFoods: "/app/cmv-mensal/alimentos",
   reports: "/app/relatorios",
   reportRestaurant: "/app/relatorios/restaurante",
   reportRefeitorio: "/app/relatorios/refeitorio",
@@ -109,11 +109,8 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5174";
 function App() {
   const [currentScreen, setCurrentScreen] = useState(() => getScreenFromPath(window.location.pathname));
   const [cmvTarget, setCmvTarget] = useLocalStorageState("cmv-target", DEFAULT_CMV_TARGET);
-  const [weeklyEntries, setWeeklyEntries] = useState([]);
   const [monthlyEntries, setMonthlyEntries] = useState([]);
-  const [weeklyForm, setWeeklyForm] = useState(baseEntry);
   const [monthlyForm, setMonthlyForm] = useState(baseEntry);
-  const [editingWeeklyId, setEditingWeeklyId] = useState(null);
   const [editingMonthlyId, setEditingMonthlyId] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [authStatus, setAuthStatus] = useState("loading");
@@ -175,56 +172,54 @@ function App() {
     }
   }, [currentScreen, currentUser]);
 
-  const calculatedWeekly = useMemo(
-    () => [...weeklyEntries].map((entry) => buildCalculatedRecord(entry, cmvTarget)).reverse(),
-    [weeklyEntries, cmvTarget]
-  );
-
-  const calculatedMonthly = useMemo(
+  const calculatedMonthlyAll = useMemo(
     () => [...monthlyEntries].map((entry) => buildCalculatedRecord(entry, cmvTarget)).reverse(),
     [monthlyEntries, cmvTarget]
   );
 
-  const latestWeek = calculatedWeekly[0];
-  const previousWeek = calculatedWeekly[1];
-  const latestMonth = calculatedMonthly[0];
-  const previousMonth = calculatedMonthly[1];
+  const monthlyGeneralRecords = useMemo(
+    () => calculatedMonthlyAll.filter((entry) => (entry.category || "geral") === "geral"),
+    [calculatedMonthlyAll]
+  );
 
-  const weekTrend = compareTrend(latestWeek?.cmvPercent ?? 0, previousWeek?.cmvPercent ?? 0);
+  const monthlyBeveragesRecords = useMemo(
+    () => calculatedMonthlyAll.filter((entry) => entry.category === "bebidas"),
+    [calculatedMonthlyAll]
+  );
+
+  const monthlyFoodsRecords = useMemo(
+    () => calculatedMonthlyAll.filter((entry) => entry.category === "alimentos"),
+    [calculatedMonthlyAll]
+  );
+
+  const latestMonth = monthlyGeneralRecords[0];
+  const previousMonth = monthlyGeneralRecords[1];
+
   const monthTrend = compareTrend(latestMonth?.cmvPercent ?? 0, previousMonth?.cmvPercent ?? 0);
 
   const dashboardInsights = useMemo(() => {
     const insights = [];
 
-    if ((latestWeek?.cmvPercent ?? 0) > 40 || (latestMonth?.cmvPercent ?? 0) > 40) {
+    if ((latestMonth?.cmvPercent ?? 0) > 40) {
       insights.push("Alerta: CMV acima do ideal. Verifique desperdícios ou aumento de custos.");
     }
 
-    if ((latestWeek?.purchasesPercent ?? 0) > 45 || (latestMonth?.purchasesPercent ?? 0) > 45) {
+    if ((latestMonth?.purchasesPercent ?? 0) > 45) {
       insights.push("Compras muito altas em relacao ao faturamento.");
     }
 
-    if ((toNumber(latestWeek?.perdas) > 0 && toNumber(latestWeek?.perdas) / Math.max(toNumber(latestWeek?.faturamento), 1) > 0.06) ||
-      (toNumber(latestMonth?.perdas) > 0 && toNumber(latestMonth?.perdas) / Math.max(toNumber(latestMonth?.faturamento), 1) > 0.06)) {
+    if ((toNumber(latestMonth?.perdas) > 0 && toNumber(latestMonth?.perdas) / Math.max(toNumber(latestMonth?.faturamento), 1) > 0.06)) {
       insights.push("Desperdicio elevado registrado.");
     }
 
     if (!insights.length) {
-      insights.push("Indicadores dentro da faixa esperada. Mantenha o controle semanal de estoque e perdas.");
+      insights.push("Indicadores dentro da faixa esperada. Mantenha o controle mensal de estoque e perdas.");
     }
 
     return insights;
-  }, [latestMonth, latestWeek]);
+  }, [latestMonth]);
 
-  const chartWeeklyData = calculatedWeekly
-    .slice()
-    .reverse()
-    .map((entry) => ({
-      reference: entry.reference,
-      cmvPercent: Number(entry.cmvPercent.toFixed(2)),
-    }));
-
-  const chartMonthlyData = calculatedMonthly
+  const chartMonthlyData = monthlyGeneralRecords
     .slice()
     .reverse()
     .map((entry) => ({
@@ -234,26 +229,12 @@ function App() {
 
   const comparisonData = [
     {
-      metric: "Semanal",
-      cmvPercent: Number((latestWeek?.cmvPercent ?? 0).toFixed(2)),
-      purchasesPercent: Number((latestWeek?.purchasesPercent ?? 0).toFixed(2)),
-      target: Number(toNumber(cmvTarget).toFixed(2)),
-    },
-    {
       metric: "Mensal",
       cmvPercent: Number((latestMonth?.cmvPercent ?? 0).toFixed(2)),
       purchasesPercent: Number((latestMonth?.purchasesPercent ?? 0).toFixed(2)),
       target: Number(toNumber(cmvTarget).toFixed(2)),
     },
   ];
-
-  const loadWeekly = async () => {
-    const response = await fetch(`${API_BASE}/data/cmv/weekly`, { credentials: "include" });
-    if (!response.ok) return;
-    const payload = await response.json();
-    if (!payload.ok) return;
-    setWeeklyEntries(payload.data.map(mapWeeklyFromApi));
-  };
 
   const loadMonthly = async () => {
     const response = await fetch(`${API_BASE}/data/cmv/monthly`, { credentials: "include" });
@@ -265,36 +246,14 @@ function App() {
 
   useEffect(() => {
     if (!currentUser || currentUser.status !== "approved" || currentUser.role === "admin") return;
-    loadWeekly();
     loadMonthly();
   }, [currentUser]);
 
-  const saveWeekly = (event) => {
-    event.preventDefault();
-    if (!weeklyForm.reference) return;
-    const existing = editingWeeklyId ? weeklyEntries.find((item) => item.id === editingWeeklyId) : null;
-
-    const payload = {
-      id: editingWeeklyId ?? crypto.randomUUID(),
-      reference: weeklyForm.reference,
-      estoqueInicial: toNumber(weeklyForm.estoqueInicial),
-      compras: toNumber(weeklyForm.compras),
-      estoqueFinal: toNumber(weeklyForm.estoqueFinal),
-      faturamento: toNumber(weeklyForm.faturamento),
-      perdas: toNumber(weeklyForm.perdas),
-      createdBy: existing?.createdBy ?? (currentUser?.username ?? "Desconhecido"),
-      createdAt: Date.now(),
-    };
-
-    saveWeeklyApi(payload).then(loadWeekly);
-    setWeeklyForm(baseEntry);
-    setEditingWeeklyId(null);
-  };
-
-  const saveMonthly = (event) => {
+  const saveMonthly = (event, category) => {
     event.preventDefault();
     if (!monthlyForm.reference) return;
     const existing = editingMonthlyId ? monthlyEntries.find((item) => item.id === editingMonthlyId) : null;
+    const categoryToSave = existing?.category || category;
 
     const payload = {
       id: editingMonthlyId ?? crypto.randomUUID(),
@@ -304,6 +263,7 @@ function App() {
       estoqueFinal: toNumber(monthlyForm.estoqueFinal),
       faturamento: toNumber(monthlyForm.faturamento),
       perdas: toNumber(monthlyForm.perdas),
+      category: categoryToSave,
       createdBy: existing?.createdBy ?? (currentUser?.username ?? "Desconhecido"),
       createdAt: Date.now(),
     };
@@ -311,18 +271,6 @@ function App() {
     saveMonthlyApi(payload).then(loadMonthly);
     setMonthlyForm(baseEntry);
     setEditingMonthlyId(null);
-  };
-
-  const startWeeklyEdit = (record) => {
-    setEditingWeeklyId(record.id);
-    setWeeklyForm({
-      reference: record.reference ?? "",
-      estoqueInicial: String(toNumber(record.estoqueInicial)),
-      compras: String(toNumber(record.compras)),
-      estoqueFinal: String(toNumber(record.estoqueFinal)),
-      faturamento: String(toNumber(record.faturamento)),
-      perdas: String(toNumber(record.perdas)),
-    });
   };
 
   const startMonthlyEdit = (record) => {
@@ -337,15 +285,14 @@ function App() {
     });
   };
 
-  const cancelWeeklyEdit = () => {
-    setEditingWeeklyId(null);
-    setWeeklyForm(baseEntry);
-  };
-
   const cancelMonthlyEdit = () => {
     setEditingMonthlyId(null);
     setMonthlyForm(baseEntry);
   };
+
+  const saveMonthlyGeneral = (event) => saveMonthly(event, "geral");
+  const saveMonthlyBeverages = (event) => saveMonthly(event, "bebidas");
+  const saveMonthlyFoods = (event) => saveMonthly(event, "alimentos");
 
   const logout = () => {
     fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" }).finally(() => {
@@ -398,7 +345,11 @@ function App() {
               const Icon = item.icon;
               const active =
                 currentScreen === item.id ||
-                (item.id === "reports" && (currentScreen === "reportRestaurant" || currentScreen === "reportRefeitorio"));
+                (item.id === "reports" && (currentScreen === "reportRestaurant" || currentScreen === "reportRefeitorio")) ||
+                (item.id === "monthly" &&
+                  (currentScreen === "monthlyGeneral" ||
+                    currentScreen === "monthlyBeverages" ||
+                    currentScreen === "monthlyFoods"));
 
               return (
                 <button
@@ -432,49 +383,82 @@ function App() {
         <main className="flex-1 space-y-4 animate-rise md:space-y-6">
           {currentScreen === "dashboard" && (
             <DashboardView
-              latestWeek={latestWeek}
               latestMonth={latestMonth}
-              weekTrend={weekTrend}
               monthTrend={monthTrend}
               cmvTarget={cmvTarget}
               setCmvTarget={setCmvTarget}
               canEditTarget={currentUser.role !== "viewer"}
               comparisonData={comparisonData}
-              chartWeeklyData={chartWeeklyData}
               chartMonthlyData={chartMonthlyData}
               dashboardInsights={dashboardInsights}
             />
           )}
 
-          {currentScreen === "weekly" && currentUser.role !== "viewer" && (
-            <EntryView
-              title="CMV Semanal"
-              subtitle="Registre os dados da semana para calcular CMV e percentuais automaticamente."
-              formState={weeklyForm}
-              setFormState={setWeeklyForm}
-              referenceType="week"
-              submit={saveWeekly}
-              records={calculatedWeekly}
-              isEditing={Boolean(editingWeeklyId)}
-              onEditRecord={startWeeklyEdit}
-              onCancelEdit={cancelWeeklyEdit}
+          {currentScreen === "monthly" && currentUser.role !== "viewer" && (
+            <MonthlyCmvHubView
+              openGeneral={() => {
+                setEditingMonthlyId(null);
+                setMonthlyForm(baseEntry);
+                setCurrentScreen("monthlyGeneral");
+              }}
+              openBeverages={() => {
+                setEditingMonthlyId(null);
+                setMonthlyForm(baseEntry);
+                setCurrentScreen("monthlyBeverages");
+              }}
+              openFoods={() => {
+                setEditingMonthlyId(null);
+                setMonthlyForm(baseEntry);
+                setCurrentScreen("monthlyFoods");
+              }}
             />
           )}
 
-          {currentScreen === "monthly" && currentUser.role !== "viewer" && (
+          {currentScreen === "monthlyGeneral" && currentUser.role !== "viewer" && (
             <EntryView
-              title="CMV Mensal"
-              subtitle="Registre os dados do mês para consolidar o acompanhamento financeiro do CMV."
+              title="CMV Mensal - CMV Geral"
+              subtitle="Registre o CMV mensal consolidado (alimentos e bebidas)."
               formState={monthlyForm}
               setFormState={setMonthlyForm}
               referenceType="month"
-              submit={saveMonthly}
-              records={calculatedMonthly}
+              submit={saveMonthlyGeneral}
+              records={monthlyGeneralRecords}
               isEditing={Boolean(editingMonthlyId)}
               onEditRecord={startMonthlyEdit}
               onCancelEdit={cancelMonthlyEdit}
             />
           )}
+
+          {currentScreen === "monthlyBeverages" && currentUser.role !== "viewer" && (
+            <EntryView
+              title="CMV Mensal - Bebidas"
+              subtitle="Registre apenas o CMV mensal de bebidas e vinhos."
+              formState={monthlyForm}
+              setFormState={setMonthlyForm}
+              referenceType="month"
+              submit={saveMonthlyBeverages}
+              records={monthlyBeveragesRecords}
+              isEditing={Boolean(editingMonthlyId)}
+              onEditRecord={startMonthlyEdit}
+              onCancelEdit={cancelMonthlyEdit}
+            />
+          )}
+
+          {currentScreen === "monthlyFoods" && currentUser.role !== "viewer" && (
+            <EntryView
+              title="CMV Mensal - Alimentos"
+              subtitle="Registre apenas o CMV mensal de alimentos."
+              formState={monthlyForm}
+              setFormState={setMonthlyForm}
+              referenceType="month"
+              submit={saveMonthlyFoods}
+              records={monthlyFoodsRecords}
+              isEditing={Boolean(editingMonthlyId)}
+              onEditRecord={startMonthlyEdit}
+              onCancelEdit={cancelMonthlyEdit}
+            />
+          )}
+
 
           {currentScreen === "reports" && (
             <ReportsHubView
@@ -485,10 +469,10 @@ function App() {
 
           {currentScreen === "reportRestaurant" && (
             <ReportsView
-              weeklyRecords={calculatedWeekly}
-              monthlyRecords={calculatedMonthly}
+              monthlyRecords={monthlyGeneralRecords}
+              monthlyBeveragesRecords={monthlyBeveragesRecords}
+              monthlyFoodsRecords={monthlyFoodsRecords}
               cmvTarget={cmvTarget}
-              chartWeeklyData={chartWeeklyData}
               chartMonthlyData={chartMonthlyData}
               comparisonData={comparisonData}
               onBack={() => setCurrentScreen("reports")}
@@ -572,13 +556,6 @@ function AuthView({ status, message, onLogin, onRetry }) {
 }
 
 function LandingView({ onLogin }) {
-  const weeklyData = [
-    { label: "S1", value: 34 },
-    { label: "S2", value: 32 },
-    { label: "S3", value: 36 },
-    { label: "S4", value: 33 },
-  ];
-
   const monthlyData = [
     { label: "Out", value: 38 },
     { label: "Nov", value: 35 },
@@ -643,20 +620,7 @@ function LandingView({ onLogin }) {
             <p className="mt-2 text-base font-semibold text-ink">Indicador disponível</p>
           </div>
         </section>
-
-        <section className="mt-6 grid gap-4 xl:grid-cols-2">
-          <ChartCard title="Tendência CMV semanal">
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={weeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
-                <XAxis dataKey="label" />
-                <YAxis domain={[0, 50]} unit="%" />
-                <Tooltip formatter={(value) => `${value}%`} />
-                <Line type="monotone" dataKey="value" stroke="#1793A5" strokeWidth={3} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
+        <section className="mt-6">
           <ChartCard title="Tendência CMV mensal">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyData}>
@@ -851,19 +815,15 @@ function AdminView() {
 }
 
 function DashboardView({
-  latestWeek,
   latestMonth,
-  weekTrend,
   monthTrend,
   cmvTarget,
   setCmvTarget,
   canEditTarget,
   comparisonData,
-  chartWeeklyData,
   chartMonthlyData,
   dashboardInsights,
 }) {
-  const weekHealth = latestWeek?.health;
   const monthHealth = latestMonth?.health;
 
   return (
@@ -890,27 +850,6 @@ function DashboardView({
           icon={ShoppingCart}
           trend={monthTrend}
         />
-        <KpiCard
-          title="CMV Semanal"
-          value={formatCurrency(latestWeek?.cmv ?? 0)}
-          percent={formatPercent(latestWeek?.cmvPercent ?? 0)}
-          icon={BarChart3}
-          trend={weekTrend}
-        />
-        <KpiCard
-          title="Faturamento da Semana"
-          value={formatCurrency(latestWeek?.faturamento ?? 0)}
-          percent={formatPercent(latestWeek?.cmvPercent ?? 0)}
-          icon={Wallet}
-          trend={weekTrend}
-        />
-        <KpiCard
-          title="Compras da Semana"
-          value={formatCurrency(latestWeek?.compras ?? 0)}
-          percent={formatPercent(latestWeek?.purchasesPercent ?? 0)}
-          icon={ShoppingCart}
-          trend={weekTrend}
-        />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-4">
@@ -931,33 +870,20 @@ function DashboardView({
           {!canEditTarget && <p className="mt-2 text-xs text-slate-500">Perfil visualizador: edicao bloqueada.</p>}
         </div>
 
-        <HealthCard title="Diferenca CMV x Meta" value={formatPercent((latestWeek?.targetDiff ?? 0))} health={latestWeek?.health} />
-        <HealthCard title="Compras % Semana" value={formatPercent(latestWeek?.purchasesPercent ?? 0)} health={latestWeek?.health} />
-        <HealthCard title="Perdas Semana" value={formatCurrency(latestWeek?.perdas ?? 0)} health={latestWeek?.health} />
+        <HealthCard title="Diferença CMV x Meta" value={formatPercent((latestMonth?.targetDiff ?? 0))} health={latestMonth?.health} />
+        <HealthCard title="Compras % Mensal" value={formatPercent(latestMonth?.purchasesPercent ?? 0)} health={latestMonth?.health} />
+        <HealthCard title="Perdas do Mês" value={formatCurrency(latestMonth?.perdas ?? 0)} health={latestMonth?.health} />
 
         <div className="card-surface p-4 lg:col-span-4">
           <p className="text-sm text-slate-500">Indicador de saúde</p>
           <div className="mt-3 flex flex-wrap gap-3">
-            <StatusBadge label={`Semana: ${weekHealth?.label ?? "Sem dados"}`} health={weekHealth} />
             <StatusBadge label={`Mês: ${monthHealth?.label ?? "Sem dados"}`} health={monthHealth} />
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Evolucao do CMV semanal %">
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartWeeklyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
-              <XAxis dataKey="reference" />
-              <YAxis domain={[0, 100]} unit="%" />
-              <Tooltip formatter={(value) => `${value}%`} />
-              <Line type="monotone" dataKey="cmvPercent" stroke="#1793A5" strokeWidth={3} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Evolucao do CMV mensal %">
+        <ChartCard title="Evolução do CMV mensal %">
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartMonthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -969,7 +895,7 @@ function DashboardView({
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Comparacao CMV %, Compras % e Meta">
+        <ChartCard title="Comparação CMV %, Compras % e Meta">
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={comparisonData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -986,7 +912,7 @@ function DashboardView({
       </section>
 
       <section className="card-surface p-5">
-        <h3 className="text-lg font-semibold text-ink">Insights automaticos</h3>
+        <h3 className="text-lg font-semibold text-ink">Insights automáticos</h3>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {dashboardInsights.map((insight) => (
             <div key={insight} className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-700">
@@ -998,10 +924,10 @@ function DashboardView({
     </>
   );
 }
-
 function EntryView({
   title,
   subtitle,
+  categoryTabs,
   formState,
   setFormState,
   referenceType,
@@ -1031,6 +957,7 @@ function EntryView({
       <section className="card-surface p-5">
         <h2 className="text-xl font-semibold text-ink">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        {categoryTabs}
 
         <form className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={submit}>
           <InputField
@@ -1165,6 +1092,42 @@ function EntryView({
   );
 }
 
+function MonthlyCmvHubView({ openGeneral, openBeverages, openFoods }) {
+  return (
+    <section className="grid gap-4 md:grid-cols-3">
+      <button
+        type="button"
+        onClick={openGeneral}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">CMV Mensal</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">CMV Geral</h3>
+        <p className="mt-2 text-sm text-slate-500">Alimente o CMV consolidado de alimentos e bebidas.</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={openBeverages}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">CMV Mensal</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">CMV Bebidas</h3>
+        <p className="mt-2 text-sm text-slate-500">Alimente apenas os dados do bar, bebidas e vinhos.</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={openFoods}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">CMV Mensal</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">CMV Alimentos</h3>
+        <p className="mt-2 text-sm text-slate-500">Alimente apenas o CMV analítico de alimentos.</p>
+      </button>
+    </section>
+  );
+}
+
 function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
   return (
     <section className="grid gap-4 md:grid-cols-2">
@@ -1176,7 +1139,7 @@ function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
         <p className="text-sm uppercase tracking-wide text-brand-700">Relatórios</p>
         <h3 className="mt-2 text-2xl font-semibold text-ink">Relatório Restaurante</h3>
         <p className="mt-2 text-sm text-slate-500">
-          KPIs, análise de CMV, comparativos e histórico semanal/mensal com exportação em PDF.
+          KPIs, análise de CMV, comparativos e histórico mensal com exportação em PDF.
         </p>
       </button>
 
@@ -1196,33 +1159,30 @@ function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
 }
 
 function ReportsView({
-  weeklyRecords,
   monthlyRecords,
+  monthlyBeveragesRecords,
+  monthlyFoodsRecords,
   cmvTarget,
-  chartWeeklyData,
   chartMonthlyData,
   comparisonData,
   onBack,
 }) {
-  const weeklyAvg = average(weeklyRecords.map((record) => record.cmvPercent));
   const monthlyAvg = average(monthlyRecords.map((record) => record.cmvPercent));
-  const weeklyLosses = sum(weeklyRecords.map((record) => toNumber(record.perdas)));
+  const beveragesAvg = average(monthlyBeveragesRecords.map((record) => record.cmvPercent));
+  const foodsAvg = average(monthlyFoodsRecords.map((record) => record.cmvPercent));
   const monthlyLosses = sum(monthlyRecords.map((record) => toNumber(record.perdas)));
+  const beveragesLosses = sum(monthlyBeveragesRecords.map((record) => toNumber(record.perdas)));
+  const foodsLosses = sum(monthlyFoodsRecords.map((record) => toNumber(record.perdas)));
   const printRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleGeneratePdf = async () => {
     if (!printRef.current || isGenerating) return;
-
     try {
       setIsGenerating(true);
       await new Promise((resolve) => setTimeout(resolve, 200));
 
-      const canvas = await html2canvas(printRef.current, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-      });
-
+      const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: "#ffffff" });
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -1234,7 +1194,6 @@ function ReportsView({
 
       let heightLeft = imageHeight;
       let position = margin;
-
       pdf.addImage(imageData, "PNG", margin, position, printableWidth, imageHeight, undefined, "FAST");
       heightLeft -= printableHeight;
 
@@ -1258,32 +1217,19 @@ function ReportsView({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-ink">Relatório Restaurante</h2>
-            <p className="mt-1 text-sm text-slate-500">Indicadores e histórico do setor restaurante.</p>
+            <p className="mt-1 text-sm text-slate-500">Indicadores e histórico mensal do setor restaurante.</p>
           </div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            Voltar
-          </button>
+          <button type="button" onClick={onBack} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">Voltar</button>
         </div>
       </section>
 
       <section className="card-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink">Emissao de relatorio</h3>
-            <p className="text-sm text-slate-500">
-              Gere um PDF com graficos, medias, comparativo e registros semanal/mensal.
-            </p>
+            <h3 className="text-lg font-semibold text-ink">Emissão de relatório</h3>
+            <p className="text-sm text-slate-500">Gere um PDF com gráficos, médias, comparativo e registros mensais.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleGeneratePdf}
-            disabled={isGenerating}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70"
-          >
+          <button type="button" onClick={handleGeneratePdf} disabled={isGenerating} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70">
             <FileDown size={16} />
             {isGenerating ? "Gerando PDF..." : "Emitir PDF"}
           </button>
@@ -1292,80 +1238,96 @@ function ReportsView({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="card-surface p-5">
-          <h3 className="text-lg font-semibold text-ink">Resumo semanal</h3>
-          <p className="mt-4 text-sm text-slate-600">Media de CMV %: <strong>{formatPercent(weeklyAvg)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(weeklyLosses)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{weeklyRecords.length}</strong></p>
-        </div>
-
-        <div className="card-surface p-5">
-          <h3 className="text-lg font-semibold text-ink">Resumo mensal</h3>
-          <p className="mt-4 text-sm text-slate-600">Media de CMV %: <strong>{formatPercent(monthlyAvg)}</strong></p>
+          <h3 className="text-lg font-semibold text-ink">Resumo mensal - Geral</h3>
+          <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(monthlyAvg)}</strong></p>
           <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(monthlyLosses)}</strong></p>
           <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyRecords.length}</strong></p>
         </div>
-
-        <div className="card-surface p-5 md:col-span-2">
-          <h3 className="text-lg font-semibold text-ink">Analise de meta</h3>
-          <p className="mt-3 text-sm text-slate-600">
-            Meta atual: <strong>{formatPercent(cmvTarget)}</strong>
-          </p>
-          <p className="mt-2 text-sm text-slate-600">
-            Semanal acima da meta: <strong>{weeklyRecords.filter((record) => record.cmvPercent > cmvTarget).length}</strong>
-          </p>
-          <p className="mt-2 text-sm text-slate-600">
-            Mensal acima da meta: <strong>{monthlyRecords.filter((record) => record.cmvPercent > cmvTarget).length}</strong>
-          </p>
+        <div className="card-surface p-5">
+          <h3 className="text-lg font-semibold text-ink">Análise de meta</h3>
+          <p className="mt-3 text-sm text-slate-600">Meta atual: <strong>{formatPercent(cmvTarget)}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Mensal acima da meta: <strong>{monthlyRecords.filter((record) => record.cmvPercent > cmvTarget).length}</strong></p>
         </div>
       </section>
 
-      <ReportRecordsTable title="Registros semanais detalhados" records={weeklyRecords} />
+      <section className="grid gap-4 md:grid-cols-2">
+        <div className="card-surface p-5">
+          <h3 className="text-lg font-semibold text-ink">CMV mensal analítico - Bebidas</h3>
+          <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(beveragesAvg)}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(beveragesLosses)}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyBeveragesRecords.length}</strong></p>
+        </div>
+        <div className="card-surface p-5">
+          <h3 className="text-lg font-semibold text-ink">CMV mensal analítico - Alimentos</h3>
+          <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(foodsAvg)}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(foodsLosses)}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyFoodsRecords.length}</strong></p>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <ChartCard title="Evolução do CMV mensal %">
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartMonthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+              <XAxis dataKey="reference" />
+              <YAxis domain={[0, 100]} unit="%" />
+              <Tooltip formatter={(value) => `${value}%`} />
+              <Line type="monotone" dataKey="cmvPercent" stroke="#F6A740" strokeWidth={3} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="Comparação CMV %, Compras % e Meta">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={comparisonData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+              <XAxis dataKey="metric" />
+              <YAxis domain={[0, 100]} unit="%" />
+              <Tooltip formatter={(value) => `${value}%`} />
+              <Legend />
+              <Bar dataKey="cmvPercent" fill="#1793A5" name="CMV %" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="purchasesPercent" fill="#4f46e5" name="Compras %" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="target" fill="#F6A740" name="Meta %" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </section>
+
       <ReportRecordsTable title="Registros mensais detalhados" records={monthlyRecords} />
+      <ReportRecordsTable title="Registros mensais - Bebidas" records={monthlyBeveragesRecords} />
+      <ReportRecordsTable title="Registros mensais - Alimentos" records={monthlyFoodsRecords} />
 
       <div className="fixed -left-[99999px] top-0 w-[1180px] bg-white p-8 text-black" ref={printRef}>
         <h1 className="text-2xl font-semibold">Relatório CMV</h1>
-        <p className="mt-1 text-sm">Data de emissao: {new Date().toLocaleDateString("pt-BR")}</p>
-
+        <p className="mt-1 text-sm">Data de emissão: {new Date().toLocaleDateString("pt-BR")}</p>
         <section className="mt-6 grid grid-cols-2 gap-4">
           <div className="rounded-lg border border-slate-200 p-4">
-            <h2 className="text-base font-semibold">Media de CMV semanal</h2>
-            <p className="mt-2 text-lg">{formatPercent(weeklyAvg)}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 p-4">
-            <h2 className="text-base font-semibold">Media de CMV mensal</h2>
+            <h2 className="text-base font-semibold">Média de CMV mensal - Geral</h2>
             <p className="mt-2 text-lg">{formatPercent(monthlyAvg)}</p>
           </div>
-        </section>
-
-        <section className="mt-6 grid grid-cols-2 gap-4">
           <div className="rounded-lg border border-slate-200 p-4">
-            <h2 className="mb-3 text-base font-semibold">Evolucao do CMV semanal %</h2>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartWeeklyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
-                <XAxis dataKey="reference" />
-                <YAxis domain={[0, 100]} unit="%" />
-                <Tooltip formatter={(value) => `${value}%`} />
-                <Line type="monotone" dataKey="cmvPercent" stroke="#1793A5" strokeWidth={3} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <h2 className="text-base font-semibold">Média de CMV mensal - Bebidas</h2>
+            <p className="mt-2 text-lg">{formatPercent(beveragesAvg)}</p>
           </div>
           <div className="rounded-lg border border-slate-200 p-4">
-            <h2 className="mb-3 text-base font-semibold">Evolucao do CMV mensal %</h2>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={chartMonthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
-                <XAxis dataKey="reference" />
-                <YAxis domain={[0, 100]} unit="%" />
-                <Tooltip formatter={(value) => `${value}%`} />
-                <Line type="monotone" dataKey="cmvPercent" stroke="#F6A740" strokeWidth={3} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <h2 className="text-base font-semibold">Média de CMV mensal - Alimentos</h2>
+            <p className="mt-2 text-lg">{formatPercent(foodsAvg)}</p>
           </div>
         </section>
-
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
-          <h2 className="mb-3 text-base font-semibold">Comparacao CMV %, Compras % e Meta</h2>
+          <h2 className="mb-3 text-base font-semibold">Evolução do CMV mensal %</h2>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={chartMonthlyData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+              <XAxis dataKey="reference" />
+              <YAxis domain={[0, 100]} unit="%" />
+              <Tooltip formatter={(value) => `${value}%`} />
+              <Line type="monotone" dataKey="cmvPercent" stroke="#F6A740" strokeWidth={3} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </section>
+        <section className="mt-6 rounded-lg border border-slate-200 p-4">
+          <h2 className="mb-3 text-base font-semibold">Comparação CMV %, Compras % e Meta</h2>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={comparisonData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
@@ -1379,21 +1341,22 @@ function ReportsView({
             </BarChart>
           </ResponsiveContainer>
         </section>
-
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
-          <h2 className="text-base font-semibold">Registros da semana</h2>
-          <ReportRecordsStaticTable records={weeklyRecords} />
-        </section>
-
-        <section className="mt-6 rounded-lg border border-slate-200 p-4">
-          <h2 className="text-base font-semibold">Registros do mês</h2>
+          <h2 className="text-base font-semibold">Registros do mês - Geral</h2>
           <ReportRecordsStaticTable records={monthlyRecords} />
+        </section>
+        <section className="mt-6 rounded-lg border border-slate-200 p-4">
+          <h2 className="text-base font-semibold">Registros do mês - Bebidas</h2>
+          <ReportRecordsStaticTable records={monthlyBeveragesRecords} />
+        </section>
+        <section className="mt-6 rounded-lg border border-slate-200 p-4">
+          <h2 className="text-base font-semibold">Registros do mês - Alimentos</h2>
+          <ReportRecordsStaticTable records={monthlyFoodsRecords} />
         </section>
       </div>
     </div>
   );
 }
-
 function RefeitorioReportView({ onBack }) {
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
@@ -2235,24 +2198,11 @@ function getMealCostStatus(costPerMeal) {
   };
 }
 
-function mapWeeklyFromApi(row) {
-  return {
-    id: row.id,
-    reference: row.reference,
-    estoqueInicial: toNumber(row.estoque_inicial),
-    compras: toNumber(row.compras),
-    estoqueFinal: toNumber(row.estoque_final),
-    faturamento: toNumber(row.faturamento),
-    perdas: toNumber(row.perdas),
-    createdBy: row.created_by || "-",
-    createdAt: row.created_at,
-  };
-}
-
 function mapMonthlyFromApi(row) {
   return {
     id: row.id,
     reference: row.reference,
+    category: row.category || "geral",
     estoqueInicial: toNumber(row.estoque_inicial),
     compras: toNumber(row.compras),
     estoqueFinal: toNumber(row.estoque_final),
@@ -2290,28 +2240,11 @@ function mapRefeitorioDailyFromApi(row) {
   };
 }
 
-async function saveWeeklyApi(record) {
-  const payload = {
-    id: record.id,
-    reference: record.reference,
-    estoque_inicial: record.estoqueInicial,
-    compras: record.compras,
-    estoque_final: record.estoqueFinal,
-    faturamento: record.faturamento,
-    perdas: record.perdas,
-  };
-  await fetch(`${API_BASE}/data/cmv/weekly`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
-}
-
 async function saveMonthlyApi(record) {
   const payload = {
     id: record.id,
     reference: record.reference,
+    category: record.category || "geral",
     estoque_inicial: record.estoqueInicial,
     compras: record.compras,
     estoque_final: record.estoqueFinal,
@@ -2336,3 +2269,5 @@ function average(values) {
 }
 
 export default App;
+
+
