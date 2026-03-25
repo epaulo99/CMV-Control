@@ -1,7 +1,37 @@
 export const DEFAULT_CMV_TARGET = 35;
 
 export const toNumber = (value) => {
-  const parsed = Number(value);
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value !== "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return 0;
+
+  // Accepts pt-BR and en-US typed formats, with optional currency symbols.
+  const sanitized = trimmed.replace(/\s/g, "").replace(/[R$r$\u00A0]/g, "").replace(/[^0-9,.-]/g, "");
+  if (!sanitized) return 0;
+
+  let normalized = sanitized;
+  const commaIndex = normalized.lastIndexOf(",");
+  const dotIndex = normalized.lastIndexOf(".");
+
+  if (commaIndex > -1 && dotIndex > -1) {
+    if (commaIndex > dotIndex) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else {
+      normalized = normalized.replace(/,/g, "");
+    }
+  } else if (commaIndex > -1) {
+    normalized = normalized.replace(",", ".");
+  }
+
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
@@ -67,7 +97,7 @@ export const compareTrend = (current, previous) => {
   const diff = currentValue - previousValue;
 
   if (Math.abs(diff) < 0.01) {
-    return { direction: "stable", text: "Sem variacao" };
+    return { direction: "stable", text: "Sem variação" };
   }
 
   return {
