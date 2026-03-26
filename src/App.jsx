@@ -46,6 +46,7 @@ const NAV_ITEMS = [
   { id: "monthly", label: "CMV Mensal", icon: BarChart3 },
   { id: "reports", label: "Relatórios", icon: Receipt },
   { id: "ranking", label: "Ranking Pratos", icon: Trophy },
+  { id: "rankingRevenue", label: "Ranking Receita", icon: Wallet },
   { id: "refeitorio", label: "Refeitório", icon: Users },
 ];
 
@@ -62,6 +63,9 @@ const SCREEN_PATHS = {
   ranking: "/app/ranking-pratos",
   rankingTop: "/app/ranking-pratos/mais-vendidos",
   rankingLeast: "/app/ranking-pratos/menos-vendidos",
+  rankingRevenue: "/app/ranking-receita",
+  rankingRevenueTop: "/app/ranking-receita/maior-receita",
+  rankingRevenueLeast: "/app/ranking-receita/menor-receita",
   refeitorio: "/app/refeitorio",
   admin: "/app/admin",
 };
@@ -83,6 +87,9 @@ function isScreenAllowedForRole(role, screen) {
       "ranking",
       "rankingTop",
       "rankingLeast",
+      "rankingRevenue",
+      "rankingRevenueTop",
+      "rankingRevenueLeast",
       "refeitorio",
     ].includes(screen);
   }
@@ -437,7 +444,7 @@ function App() {
     ? [{ id: "admin", label: "Aprovações", icon: ShieldCheck }]
     : NAV_ITEMS.filter((item) => {
         if (currentUser.role === "viewer") {
-          return ["dashboard", "reports", "ranking", "refeitorio"].includes(item.id);
+          return ["dashboard", "reports", "ranking", "rankingRevenue", "refeitorio"].includes(item.id);
         }
         return true;
       });
@@ -459,6 +466,8 @@ function App() {
                 currentScreen === item.id ||
                 (item.id === "reports" && (currentScreen === "reportRestaurant" || currentScreen === "reportRefeitorio")) ||
                 (item.id === "ranking" && (currentScreen === "rankingTop" || currentScreen === "rankingLeast")) ||
+                (item.id === "rankingRevenue" &&
+                  (currentScreen === "rankingRevenueTop" || currentScreen === "rankingRevenueLeast")) ||
                 (item.id === "monthly" &&
                   (currentScreen === "monthlyGeneral" ||
                     currentScreen === "monthlyBeverages" ||
@@ -617,6 +626,7 @@ function App() {
           {currentScreen === "rankingTop" && (
             <RankingPratosView
               mode="top"
+              metric="quantity"
               onBack={() => setCurrentScreen("ranking")}
               canUpload={currentUser.role !== "viewer"}
               history={rankingHistory}
@@ -627,7 +637,37 @@ function App() {
           {currentScreen === "rankingLeast" && (
             <RankingPratosView
               mode="least"
+              metric="quantity"
               onBack={() => setCurrentScreen("ranking")}
+              canUpload={currentUser.role !== "viewer"}
+              history={rankingHistory}
+              onSavePeriod={saveRankingMonth}
+            />
+          )}
+
+          {currentScreen === "rankingRevenue" && (
+            <RankingRevenueHubView
+              openTop={() => setCurrentScreen("rankingRevenueTop")}
+              openLeast={() => setCurrentScreen("rankingRevenueLeast")}
+            />
+          )}
+
+          {currentScreen === "rankingRevenueTop" && (
+            <RankingPratosView
+              mode="top"
+              metric="revenue"
+              onBack={() => setCurrentScreen("rankingRevenue")}
+              canUpload={currentUser.role !== "viewer"}
+              history={rankingHistory}
+              onSavePeriod={saveRankingMonth}
+            />
+          )}
+
+          {currentScreen === "rankingRevenueLeast" && (
+            <RankingPratosView
+              mode="least"
+              metric="revenue"
+              onBack={() => setCurrentScreen("rankingRevenue")}
               canUpload={currentUser.role !== "viewer"}
               history={rankingHistory}
               onSavePeriod={saveRankingMonth}
@@ -1368,7 +1408,33 @@ function RankingHubView({ openTop, openLeast }) {
   );
 }
 
-function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
+function RankingRevenueHubView({ openTop, openLeast }) {
+  return (
+    <section className="grid gap-4 md:grid-cols-2">
+      <button
+        type="button"
+        onClick={openTop}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">Ranking Receita</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">Maior Receita</h3>
+        <p className="mt-2 text-sm text-slate-500">Itens que mais movimentaram receita no período.</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={openLeast}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">Ranking Receita</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">Menor Receita</h3>
+        <p className="mt-2 text-sm text-slate-500">Itens que menos movimentaram receita no período.</p>
+      </button>
+    </section>
+  );
+}
+
+function RankingPratosView({ mode, metric = "quantity", onBack, canUpload, history, onSavePeriod }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadMonth, setUploadMonth] = useState(new Date().getMonth() + 1);
@@ -1399,15 +1465,15 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
 
   const activeRecords = activeHistory?.records ?? [];
 
-  const rankingItems = useMemo(
-    () =>
-      [...activeRecords]
-        .sort((a, b) => (mode === "top" ? b.quantidade - a.quantidade : a.quantidade - b.quantidade))
-        .slice(0, 10),
-    [activeRecords, mode]
-  );
+  const rankingItems = useMemo(() => {
+    const getMetricValue = (item) => (metric === "revenue" ? toNumber(item.vendaTotal) : toNumber(item.quantidade));
+    return [...activeRecords]
+      .sort((a, b) => (mode === "top" ? getMetricValue(b) - getMetricValue(a) : getMetricValue(a) - getMetricValue(b)))
+      .slice(0, 10);
+  }, [activeRecords, metric, mode]);
 
   const isTopRanking = mode === "top";
+  const isRevenueRanking = metric === "revenue";
 
   const resumo = useMemo(
     () => ({
@@ -1462,7 +1528,7 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
 
   const chartData = rankingItems.map((item) => ({
     nome: item.nome.length > 22 ? `${item.nome.slice(0, 22)}...` : item.nome,
-    quantidade: item.quantidade,
+    valor: isRevenueRanking ? toNumber(item.vendaTotal) : toNumber(item.quantidade),
   }));
 
   return (
@@ -1471,12 +1537,16 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold text-ink">
-              {isTopRanking ? "Ranking de Pratos Mais Vendidos" : "Ranking de Pratos Menos Vendidos"}
+              {isRevenueRanking
+                ? (isTopRanking ? "Ranking por Receita - Maior Receita" : "Ranking por Receita - Menor Receita")
+                : (isTopRanking ? "Ranking de Pratos Mais Vendidos" : "Ranking de Pratos Menos Vendidos")}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {isTopRanking
-                ? "Ranking por quantidade vendida (Qtde), com custo total e valor vendido total por prato."
-                : "Ranking dos pratos com menor quantidade vendida (Qtde), com custo total e valor vendido total por prato."}
+              {isRevenueRanking
+                ? "Ranking por valor vendido total (receita), com custo total e quantidade por item."
+                : (isTopRanking
+                    ? "Ranking por quantidade vendida (Qtde), com custo total e valor vendido total por prato."
+                    : "Ranking dos pratos com menor quantidade vendida (Qtde), com custo total e valor vendido total por prato.")}
             </p>
           </div>
           <button
@@ -1553,21 +1623,30 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PreviewCard label="Itens mapeados" value={String(resumo.totalItens)} />
-        <PreviewCard label="Quantidade total" value={String(resumo.totalQuantidade)} />
+        <PreviewCard
+          label={isRevenueRanking ? "Receita total do período" : "Quantidade total"}
+          value={isRevenueRanking ? formatCurrency(resumo.vendaTotalTop10) : String(resumo.totalQuantidade)}
+        />
         <PreviewCard label="Custo total (Top 10)" value={formatCurrency(resumo.custoTotalTop10)} />
         <PreviewCard label="Vendido total (Top 10)" value={formatCurrency(resumo.vendaTotalTop10)} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title={isTopRanking ? "Top 10 por quantidade" : "10 menos vendidos por quantidade"}>
+        <ChartCard
+          title={
+            isRevenueRanking
+              ? (isTopRanking ? "Top 10 por maior receita" : "Top 10 por menor receita")
+              : (isTopRanking ? "Top 10 por quantidade" : "10 menos vendidos por quantidade")
+          }
+        >
           <div className="h-72 w-full">
             <ResponsiveContainer>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
                 <XAxis dataKey="nome" />
                 <YAxis />
-                <Tooltip />
-                <Bar dataKey="quantidade" fill="#1793A5" radius={[6, 6, 0, 0]} />
+                <Tooltip formatter={(value) => (isRevenueRanking ? formatCurrency(value) : value)} />
+                <Bar dataKey="valor" fill="#1793A5" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1593,7 +1672,9 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
       <section className="card-surface overflow-hidden">
         <div className="border-b border-slate-200 px-5 py-4">
           <h3 className="text-lg font-semibold text-ink">
-            {isTopRanking ? "Top 10 pratos por quantidade" : "10 pratos menos vendidos por quantidade"}
+            {isRevenueRanking
+              ? (isTopRanking ? "Top 10 por maior receita" : "Top 10 por menor receita")
+              : (isTopRanking ? "Top 10 pratos por quantidade" : "10 pratos menos vendidos por quantidade")}
           </h3>
         </div>
         <div className="overflow-x-auto">
