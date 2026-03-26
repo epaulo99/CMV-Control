@@ -282,7 +282,7 @@ function App() {
   }, [currentUser]);
 
   const saveRankingMonth = async ({ month, year, records }) => {
-    await fetch(`${API_BASE}/data/ranking/monthly`, {
+    const response = await fetch(`${API_BASE}/data/ranking/monthly`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -298,6 +298,10 @@ function App() {
         })),
       }),
     });
+    const payload = await response.json().catch(() => ({ ok: false, message: "Resposta inválida do servidor." }));
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.message || "Falha ao salvar ranking no servidor.");
+    }
     await loadRanking();
   };
 
@@ -1424,9 +1428,14 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const parsed = parseSalesSpreadsheet(arrayBuffer);
+      let parsed = [];
+      try {
+        parsed = parseSalesSpreadsheet(arrayBuffer);
+      } catch (parseError) {
+        throw new Error("Não foi possível ler esta planilha. Tente salvar como .xlsx e enviar novamente.");
+      }
       if (!parsed.length) {
-        setError("Não foi possível identificar linhas de vendas válidas no arquivo.");
+        setError("Não encontramos colunas válidas (Nome/Qtde/Custo/Total). Confira o layout da planilha.");
         setLoading(false);
         return;
       }
@@ -1434,13 +1443,17 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
       const monthNumber = toNumber(uploadMonth);
       const yearNumber = toNumber(uploadYear);
 
-      await onSavePeriod({
-        month: monthNumber,
-        year: yearNumber,
-        records: parsed,
-      });
+      try {
+        await onSavePeriod({
+          month: monthNumber,
+          year: yearNumber,
+          records: parsed,
+        });
+      } catch (saveError) {
+        throw new Error(`Falha ao salvar no servidor: ${saveError.message || "erro desconhecido"}`);
+      }
     } catch (uploadError) {
-      setError("Falha ao ler o arquivo. Use planilha XLS/XLSX/CSV com colunas Nome, Qtde, Custo e Total.");
+      setError(uploadError?.message || "Falha no envio da planilha.");
     } finally {
       setLoading(false);
       event.target.value = "";
@@ -1455,24 +1468,29 @@ function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
   return (
     <div className="space-y-4 md:space-y-6">
       <section className="card-surface p-5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Voltar
-        </button>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ink">
+              {isTopRanking ? "Ranking de Pratos Mais Vendidos" : "Ranking de Pratos Menos Vendidos"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {isTopRanking
+                ? "Ranking por quantidade vendida (Qtde), com custo total e valor vendido total por prato."
+                : "Ranking dos pratos com menor quantidade vendida (Qtde), com custo total e valor vendido total por prato."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Voltar
+          </button>
+        </div>
+      </section>
 
-        <h2 className="text-xl font-semibold text-ink">
-          {isTopRanking ? "Ranking de Pratos Mais Vendidos" : "Ranking de Pratos Menos Vendidos"}
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          {isTopRanking
-            ? "Ranking por quantidade vendida (Qtde), com custo total e valor vendido total por prato."
-            : "Ranking dos pratos com menor quantidade vendida (Qtde), com custo total e valor vendido total por prato."}
-        </p>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <section className="card-surface p-5">
+        <div className="grid gap-3 md:grid-cols-4">
           <label className="block text-sm text-slate-600">
             Mês de referência
             <select
