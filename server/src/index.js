@@ -89,6 +89,21 @@ const SHEETS = {
     title: "refeitorio_diario",
     columns: ["id", "data", "mes", "ano", "qtd_refeicoes", "created_by"],
   },
+  rankingMonthly: {
+    title: "ranking_pratos_mensal",
+    columns: [
+      "id",
+      "mes",
+      "ano",
+      "codigo",
+      "nome",
+      "quantidade",
+      "custo_total",
+      "venda_total",
+      "updated_by",
+      "updated_at",
+    ],
+  },
 };
 
 let lastOAuthCallback = null;
@@ -210,6 +225,24 @@ async function updateRowById(title, columns, id, data) {
     requestBody: { values: [row] },
   });
   return true;
+}
+
+async function overwriteObjects(title, columns, objects) {
+  const spreadsheetId = process.env.SPREADSHEET_ID;
+  const maxColumn = String.fromCharCode(64 + columns.length);
+  const values = [columns, ...objects.map((item) => columns.map((column) => item[column] ?? ""))];
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `${title}!A:Z`,
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${title}!A1:${maxColumn}${values.length}`,
+    valueInputOption: "RAW",
+    requestBody: { values },
+  });
 }
 
 async function findUserByEmail(email) {
@@ -495,6 +528,46 @@ app.post("/data/refeitorio/daily", requireSession, await requireRole("collaborat
       await appendRow(SHEETS.refDaily.title, SHEETS.refDaily.columns, record);
     }
   }
+  res.json({ ok: true });
+});
+
+app.get("/data/ranking/monthly", requireSession, requireApproved, async (_req, res) => {
+  const values = await getSheetValues(SHEETS.rankingMonthly.title);
+  const data = rowsToObjects(values);
+  res.json({ ok: true, data });
+});
+
+app.post("/data/ranking/monthly", requireSession, await requireRole("collaborator"), async (req, res) => {
+  const payload = req.body;
+  const mes = Number(payload.mes);
+  const ano = Number(payload.ano);
+  const records = Array.isArray(payload.records) ? payload.records : [];
+
+  if (!mes || !ano) {
+    return res.status(400).json({ ok: false, message: "Mês e ano são obrigatórios." });
+  }
+
+  const values = await getSheetValues(SHEETS.rankingMonthly.title);
+  const existing = rowsToObjects(values);
+  const preserved = existing.filter(
+    (item) => Number(item.mes) !== mes || Number(item.ano) !== ano
+  );
+
+  const now = new Date().toISOString();
+  const monthRows = records.map((item) => ({
+    id: crypto.randomUUID(),
+    mes,
+    ano,
+    codigo: item.codigo || "",
+    nome: item.nome || "",
+    quantidade: Number(item.quantidade) || 0,
+    custo_total: Number(item.custo_total) || 0,
+    venda_total: Number(item.venda_total) || 0,
+    updated_by: req.currentUser.email,
+    updated_at: now,
+  }));
+
+  await overwriteObjects(SHEETS.rankingMonthly.title, SHEETS.rankingMonthly.columns, [...preserved, ...monthRows]);
   res.json({ ok: true });
 });
 

@@ -12,6 +12,7 @@ import {
   Target,
   TrendingDown,
   TrendingUp,
+  Trophy,
   Users,
   Wallet,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import {
 } from "recharts";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 import { useLocalStorageState } from "./hooks/useLocalStorageState";
 import {
   DEFAULT_CMV_TARGET,
@@ -43,6 +45,7 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "monthly", label: "CMV Mensal", icon: BarChart3 },
   { id: "reports", label: "Relatórios", icon: Receipt },
+  { id: "ranking", label: "Ranking Pratos", icon: Trophy },
   { id: "refeitorio", label: "Refeitório", icon: Users },
 ];
 
@@ -56,6 +59,9 @@ const SCREEN_PATHS = {
   reports: "/app/relatorios",
   reportRestaurant: "/app/relatorios/restaurante",
   reportRefeitorio: "/app/relatorios/refeitorio",
+  ranking: "/app/ranking-pratos",
+  rankingTop: "/app/ranking-pratos/mais-vendidos",
+  rankingLeast: "/app/ranking-pratos/menos-vendidos",
   refeitorio: "/app/refeitorio",
   admin: "/app/admin",
 };
@@ -69,7 +75,16 @@ function getScreenFromPath(pathname) {
 function isScreenAllowedForRole(role, screen) {
   if (role === "admin") return screen === "admin";
   if (role === "viewer") {
-    return ["dashboard", "reports", "reportRestaurant", "reportRefeitorio", "refeitorio"].includes(screen);
+    return [
+      "dashboard",
+      "reports",
+      "reportRestaurant",
+      "reportRefeitorio",
+      "ranking",
+      "rankingTop",
+      "rankingLeast",
+      "refeitorio",
+    ].includes(screen);
   }
   return screen !== "admin";
 }
@@ -117,6 +132,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState(() => getScreenFromPath(window.location.pathname));
   const [cmvTarget, setCmvTarget] = useLocalStorageState("cmv-target", DEFAULT_CMV_TARGET);
   const [monthlyEntries, setMonthlyEntries] = useState([]);
+  const [rankingHistory, setRankingHistory] = useState([]);
   const [monthlyForm, setMonthlyForm] = useState(baseEntry);
   const [editingMonthlyId, setEditingMonthlyId] = useState(null);
   const [monthlyNotice, setMonthlyNotice] = useState("");
@@ -252,10 +268,38 @@ function App() {
     setMonthlyEntries(payload.data.map(mapMonthlyFromApi));
   };
 
+  const loadRanking = async () => {
+    const response = await fetch(`${API_BASE}/data/ranking/monthly`, { credentials: "include" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (!payload.ok) return;
+    setRankingHistory(groupRankingHistoryFromApi(payload.data));
+  };
+
   useEffect(() => {
     if (!currentUser || currentUser.status !== "approved" || currentUser.role === "admin") return;
-    loadMonthly();
+    Promise.all([loadMonthly(), loadRanking()]);
   }, [currentUser]);
+
+  const saveRankingMonth = async ({ month, year, records }) => {
+    await fetch(`${API_BASE}/data/ranking/monthly`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        mes: month,
+        ano: year,
+        records: records.map((item) => ({
+          codigo: item.codigo || "",
+          nome: item.nome || "",
+          quantidade: toNumber(item.quantidade),
+          custo_total: toNumber(item.custoTotal),
+          venda_total: toNumber(item.vendaTotal),
+        })),
+      }),
+    });
+    await loadRanking();
+  };
 
   const saveMonthly = (event, category) => {
     event.preventDefault();
@@ -389,7 +433,7 @@ function App() {
     ? [{ id: "admin", label: "Aprovações", icon: ShieldCheck }]
     : NAV_ITEMS.filter((item) => {
         if (currentUser.role === "viewer") {
-          return ["dashboard", "reports", "refeitorio"].includes(item.id);
+          return ["dashboard", "reports", "ranking", "refeitorio"].includes(item.id);
         }
         return true;
       });
@@ -410,6 +454,7 @@ function App() {
               const active =
                 currentScreen === item.id ||
                 (item.id === "reports" && (currentScreen === "reportRestaurant" || currentScreen === "reportRefeitorio")) ||
+                (item.id === "ranking" && (currentScreen === "rankingTop" || currentScreen === "rankingLeast")) ||
                 (item.id === "monthly" &&
                   (currentScreen === "monthlyGeneral" ||
                     currentScreen === "monthlyBeverages" ||
@@ -557,6 +602,33 @@ function App() {
           )}
 
           {currentScreen === "reportRefeitorio" && <RefeitorioReportView onBack={() => setCurrentScreen("reports")} />}
+
+          {currentScreen === "ranking" && (
+            <RankingHubView
+              openTop={() => setCurrentScreen("rankingTop")}
+              openLeast={() => setCurrentScreen("rankingLeast")}
+            />
+          )}
+
+          {currentScreen === "rankingTop" && (
+            <RankingPratosView
+              mode="top"
+              onBack={() => setCurrentScreen("ranking")}
+              canUpload={currentUser.role !== "viewer"}
+              history={rankingHistory}
+              onSavePeriod={saveRankingMonth}
+            />
+          )}
+
+          {currentScreen === "rankingLeast" && (
+            <RankingPratosView
+              mode="least"
+              onBack={() => setCurrentScreen("ranking")}
+              canUpload={currentUser.role !== "viewer"}
+              history={rankingHistory}
+              onSavePeriod={saveRankingMonth}
+            />
+          )}
 
           {currentScreen === "refeitorio" && (
             <RefeitorioView canEdit={currentUser.role !== "viewer"} actorName={currentUser.email} />
@@ -1263,6 +1335,282 @@ function ReportsHubView({ openRestaurantReport, openRefeitorioReport }) {
         </p>
       </button>
     </section>
+  );
+}
+
+function RankingHubView({ openTop, openLeast }) {
+  return (
+    <section className="grid gap-4 md:grid-cols-2">
+      <button
+        type="button"
+        onClick={openTop}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">Ranking</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">10 Mais Vendidos</h3>
+        <p className="mt-2 text-sm text-slate-500">Pratos com maior quantidade vendida no período.</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={openLeast}
+        className="card-surface p-6 text-left transition hover:scale-[1.01] hover:border-brand-200"
+      >
+        <p className="text-sm uppercase tracking-wide text-brand-700">Ranking</p>
+        <h3 className="mt-2 text-2xl font-semibold text-ink">10 Menos Vendidos</h3>
+        <p className="mt-2 text-sm text-slate-500">Pratos com menor quantidade vendida no período.</p>
+      </button>
+    </section>
+  );
+}
+
+function RankingPratosView({ mode, onBack, canUpload, history, onSavePeriod }) {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [uploadMonth, setUploadMonth] = useState(new Date().getMonth() + 1);
+  const [uploadYear, setUploadYear] = useState(new Date().getFullYear());
+
+  const normalizedHistory = useMemo(
+    () =>
+      Object.values(
+        history.reduce((acc, item) => {
+          const key = `${String(item.year)}-${String(item.month).padStart(2, "0")}`;
+          const current = acc[key];
+          if (!current || item.uploadedAt > current.uploadedAt) {
+            acc[key] = item;
+          }
+          return acc;
+        }, {})
+      ),
+    [history]
+  );
+
+  const activeHistory = useMemo(
+    () =>
+      normalizedHistory.find(
+        (item) => toNumber(item.month) === toNumber(uploadMonth) && toNumber(item.year) === toNumber(uploadYear)
+      ) ?? null,
+    [normalizedHistory, uploadMonth, uploadYear]
+  );
+
+  const activeRecords = activeHistory?.records ?? [];
+
+  const rankingItems = useMemo(
+    () =>
+      [...activeRecords]
+        .sort((a, b) => (mode === "top" ? b.quantidade - a.quantidade : a.quantidade - b.quantidade))
+        .slice(0, 10),
+    [activeRecords, mode]
+  );
+
+  const isTopRanking = mode === "top";
+
+  const resumo = useMemo(
+    () => ({
+      totalItens: activeRecords.length,
+      totalQuantidade: sum(activeRecords.map((item) => item.quantidade)),
+      custoTotalTop10: sum(rankingItems.map((item) => item.custoTotal)),
+      vendaTotalTop10: sum(rankingItems.map((item) => item.vendaTotal)),
+    }),
+    [activeRecords, rankingItems]
+  );
+
+  const handleUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const parsed = parseSalesSpreadsheet(arrayBuffer);
+      if (!parsed.length) {
+        setError("Não foi possível identificar linhas de vendas válidas no arquivo.");
+        setLoading(false);
+        return;
+      }
+
+      const monthNumber = toNumber(uploadMonth);
+      const yearNumber = toNumber(uploadYear);
+
+      await onSavePeriod({
+        month: monthNumber,
+        year: yearNumber,
+        records: parsed,
+      });
+    } catch (uploadError) {
+      setError("Falha ao ler o arquivo. Use planilha XLS/XLSX/CSV com colunas Nome, Qtde, Custo e Total.");
+    } finally {
+      setLoading(false);
+      event.target.value = "";
+    }
+  };
+
+  const chartData = rankingItems.map((item) => ({
+    nome: item.nome.length > 22 ? `${item.nome.slice(0, 22)}...` : item.nome,
+    quantidade: item.quantidade,
+  }));
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <section className="card-surface p-5">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+        >
+          Voltar
+        </button>
+
+        <h2 className="text-xl font-semibold text-ink">
+          {isTopRanking ? "Ranking de Pratos Mais Vendidos" : "Ranking de Pratos Menos Vendidos"}
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          {isTopRanking
+            ? "Ranking por quantidade vendida (Qtde), com custo total e valor vendido total por prato."
+            : "Ranking dos pratos com menor quantidade vendida (Qtde), com custo total e valor vendido total por prato."}
+        </p>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-4">
+          <label className="block text-sm text-slate-600">
+            Mês de referência
+            <select
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-brand-500"
+              value={uploadMonth}
+              onChange={(event) => setUploadMonth(toNumber(event.target.value))}
+            >
+              {MONTH_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm text-slate-600">
+            Ano de referência
+            <input
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-brand-500"
+              type="number"
+              value={uploadYear}
+              onChange={(event) => setUploadYear(toNumber(event.target.value))}
+            />
+          </label>
+
+          {canUpload ? (
+            <label className="inline-flex cursor-pointer items-center rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700">
+              Enviar planilha
+              <input
+                type="file"
+                accept=".xls,.xlsx,.csv"
+                className="hidden"
+                onChange={handleUpload}
+              />
+            </label>
+          ) : (
+            <div className="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-500">
+              Upload bloqueado para este perfil
+            </div>
+          )}
+
+          <div className="flex items-center">
+            {loading && <span className="text-sm text-slate-500">Processando arquivo...</span>}
+            {!loading && activeHistory && (
+              <span className="text-sm text-slate-500">
+                Dados de {String(uploadMonth).padStart(2, "0")}/{uploadYear} carregados.
+              </span>
+            )}
+            {!loading && !activeHistory && (
+              <span className="text-sm text-slate-500">
+                Nenhum envio para {String(uploadMonth).padStart(2, "0")}/{uploadYear}. O próximo upload criará este mês.
+              </span>
+            )}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <PreviewCard label="Itens mapeados" value={String(resumo.totalItens)} />
+        <PreviewCard label="Quantidade total" value={String(resumo.totalQuantidade)} />
+        <PreviewCard label="Custo total (Top 10)" value={formatCurrency(resumo.custoTotalTop10)} />
+        <PreviewCard label="Vendido total (Top 10)" value={formatCurrency(resumo.vendaTotalTop10)} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <ChartCard title={isTopRanking ? "Top 10 por quantidade" : "10 menos vendidos por quantidade"}>
+          <div className="h-72 w-full">
+            <ResponsiveContainer>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+                <XAxis dataKey="nome" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="quantidade" fill="#1793A5" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Comparativo financeiro (Top 10)">
+          <div className="h-72 w-full">
+            <ResponsiveContainer>
+              <BarChart data={rankingItems}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
+                <XAxis dataKey="nome" hide />
+                <YAxis />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Legend />
+                <Bar dataKey="custoTotal" fill="#F6A740" name="Custo total" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="vendaTotal" fill="#1793A5" name="Vendido total" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </section>
+
+      <section className="card-surface overflow-hidden">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h3 className="text-lg font-semibold text-ink">
+            {isTopRanking ? "Top 10 pratos por quantidade" : "10 pratos menos vendidos por quantidade"}
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-left">#</th>
+                <th className="px-4 py-3 text-left">Código</th>
+                <th className="px-4 py-3 text-left">Prato</th>
+                <th className="px-4 py-3 text-left">Quantidade</th>
+                <th className="px-4 py-3 text-left">Custo total</th>
+                <th className="px-4 py-3 text-left">Vendido total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankingItems.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-4 text-slate-500">Nenhum dado carregado.</td>
+                </tr>
+              )}
+              {rankingItems.map((item, index) => (
+                <tr key={`${item.codigo}-${item.nome}-${index}`} className="border-t border-slate-100">
+                  <td className="px-4 py-3 font-medium text-ink">{index + 1}</td>
+                  <td className="px-4 py-3">{item.codigo || "-"}</td>
+                  <td className="px-4 py-3">{item.nome}</td>
+                  <td className="px-4 py-3">{item.quantidade}</td>
+                  <td className="px-4 py-3">{formatCurrency(item.custoTotal)}</td>
+                  <td className="px-4 py-3">{formatCurrency(item.vendaTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -2304,6 +2652,116 @@ function getMealCostStatus(costPerMeal) {
     label: "Alerta (acima de R$20)",
     className: "bg-red-100 text-red-700",
   };
+}
+
+function parseSalesSpreadsheet(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: false });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) return [];
+
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: "" });
+  if (!rows.length) return [];
+
+  const headerIndex = rows.findIndex((row) => {
+    const normalized = row.map((cell) => normalizeHeader(cell));
+    return normalized.some((cell) => cell.includes("nome")) && normalized.some((cell) => cell.includes("qtde"));
+  });
+
+  if (headerIndex < 0) return [];
+
+  const header = rows[headerIndex].map((cell) => normalizeHeader(cell));
+  const dataRows = rows.slice(headerIndex + 1);
+
+  const columns = {
+    codigo: findColumnIndex(header, ["codigo", "código"]),
+    nome: findColumnIndex(header, ["nome"]),
+    qtde: findColumnIndex(header, ["qtde", "quantidade"]),
+    vrCusto: findColumnIndex(header, ["vr. custo", "vr custo", "valor custo"]),
+    totalCusto: findColumnIndex(header, ["total custo", "custo total"]),
+    vrUnit: findColumnIndex(header, ["vr. unit", "vr unit", "valor unit", "preco unit", "preço unit"]),
+    totalUnit: findColumnIndex(header, ["total unit", "total venda", "valor total"]),
+  };
+
+  if (columns.nome === -1 || columns.qtde === -1) return [];
+
+  return dataRows
+    .map((row) => {
+      const nome = String(row[columns.nome] ?? "").trim();
+      const codigo = columns.codigo >= 0 ? String(row[columns.codigo] ?? "").trim() : "";
+      const quantidade = parseNumberBr(row[columns.qtde]);
+      if (!nome || quantidade <= 0 || nome.toLowerCase().includes("total")) return null;
+
+      const totalCusto = columns.totalCusto >= 0 ? parseCurrencyBr(row[columns.totalCusto]) : 0;
+      const vrCusto = columns.vrCusto >= 0 ? parseCurrencyBr(row[columns.vrCusto]) : 0;
+      const totalUnit = columns.totalUnit >= 0 ? parseCurrencyBr(row[columns.totalUnit]) : 0;
+      const vrUnit = columns.vrUnit >= 0 ? parseCurrencyBr(row[columns.vrUnit]) : 0;
+
+      return {
+        codigo,
+        nome,
+        quantidade,
+        custoTotal: totalCusto > 0 ? totalCusto : vrCusto * quantidade,
+        vendaTotal: totalUnit > 0 ? totalUnit : vrUnit * quantidade,
+      };
+    })
+    .filter(Boolean);
+}
+
+function findColumnIndex(headerRow, aliases) {
+  return headerRow.findIndex((cell) =>
+    aliases.some((alias) => cell.includes(normalizeHeader(alias)))
+  );
+}
+
+function normalizeHeader(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseNumberBr(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const normalized = raw.replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseCurrencyBr(value) {
+  return parseNumberBr(value);
+}
+
+function groupRankingHistoryFromApi(rows) {
+  const grouped = rows.reduce((acc, row) => {
+    const month = toNumber(row.mes);
+    const year = toNumber(row.ano);
+    if (!month || !year) return acc;
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    if (!acc[key]) {
+      acc[key] = {
+        id: key,
+        period: key,
+        month,
+        year,
+        uploadedAt: Date.parse(row.updated_at || row.created_at || new Date().toISOString()),
+        records: [],
+      };
+    }
+    acc[key].records.push({
+      codigo: row.codigo || "",
+      nome: row.nome || "",
+      quantidade: toNumber(row.quantidade),
+      custoTotal: toNumber(row.custo_total),
+      vendaTotal: toNumber(row.venda_total),
+    });
+    return acc;
+  }, {});
+
+  return Object.values(grouped).sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
 function mapMonthlyFromApi(row) {
