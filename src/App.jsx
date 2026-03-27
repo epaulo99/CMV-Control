@@ -109,6 +109,14 @@ function formatMonthReference(reference) {
   return `${month}/${year}`;
 }
 
+function formatMonthReferenceLabel(reference) {
+  if (!reference || !reference.includes("-")) return reference || "Sem dados";
+  const [year, month] = reference.split("-");
+  const monthNumber = Number(month);
+  const monthLabel = MONTH_OPTIONS.find((item) => item.value === monthNumber)?.label || month;
+  return `${monthLabel} de ${year}`;
+}
+
 const baseEntry = {
   reference: "",
   estoqueInicial: "",
@@ -1718,16 +1726,63 @@ function ReportsView({
   monthlyBeveragesRecords,
   monthlyFoodsRecords,
   cmvTarget,
-  chartMonthlyData,
-  comparisonData,
   onBack,
 }) {
-  const monthlyAvg = average(monthlyRecords.map((record) => record.cmvPercent));
-  const beveragesAvg = average(monthlyBeveragesRecords.map((record) => record.cmvPercent));
-  const foodsAvg = average(monthlyFoodsRecords.map((record) => record.cmvPercent));
-  const monthlyLosses = sum(monthlyRecords.map((record) => toNumber(record.perdas)));
-  const beveragesLosses = sum(monthlyBeveragesRecords.map((record) => toNumber(record.perdas)));
-  const foodsLosses = sum(monthlyFoodsRecords.map((record) => toNumber(record.perdas)));
+  const availableReferences = useMemo(() => {
+    const all = [
+      ...monthlyRecords.map((item) => item.reference),
+      ...monthlyBeveragesRecords.map((item) => item.reference),
+      ...monthlyFoodsRecords.map((item) => item.reference),
+    ].filter(Boolean);
+    return [...new Set(all)].sort((a, b) => b.localeCompare(a));
+  }, [monthlyBeveragesRecords, monthlyFoodsRecords, monthlyRecords]);
+
+  const [selectedReference, setSelectedReference] = useState(availableReferences[0] || "");
+
+  useEffect(() => {
+    if (!availableReferences.length) {
+      setSelectedReference("");
+      return;
+    }
+    if (!availableReferences.includes(selectedReference)) {
+      setSelectedReference(availableReferences[0]);
+    }
+  }, [availableReferences, selectedReference]);
+
+  const selectedMonthlyRecords = useMemo(
+    () => monthlyRecords.filter((record) => record.reference === selectedReference),
+    [monthlyRecords, selectedReference]
+  );
+  const selectedBeveragesRecords = useMemo(
+    () => monthlyBeveragesRecords.filter((record) => record.reference === selectedReference),
+    [monthlyBeveragesRecords, selectedReference]
+  );
+  const selectedFoodsRecords = useMemo(
+    () => monthlyFoodsRecords.filter((record) => record.reference === selectedReference),
+    [monthlyFoodsRecords, selectedReference]
+  );
+
+  const monthlyAvg = average(selectedMonthlyRecords.map((record) => record.cmvPercent));
+  const beveragesAvg = average(selectedBeveragesRecords.map((record) => record.cmvPercent));
+  const foodsAvg = average(selectedFoodsRecords.map((record) => record.cmvPercent));
+  const monthlyLosses = sum(selectedMonthlyRecords.map((record) => toNumber(record.perdas)));
+  const beveragesLosses = sum(selectedBeveragesRecords.map((record) => toNumber(record.perdas)));
+  const foodsLosses = sum(selectedFoodsRecords.map((record) => toNumber(record.perdas)));
+
+  const selectedMonthlyRecord = selectedMonthlyRecords[0];
+  const selectedChartMonthlyData = selectedMonthlyRecord
+    ? [{ reference: selectedReference, cmvPercent: Number(toNumber(selectedMonthlyRecord.cmvPercent).toFixed(2)) }]
+    : [];
+  const selectedComparisonData = [
+    {
+      metric: "Mês",
+      cmvPercent: Number((selectedMonthlyRecord?.cmvPercent ?? 0).toFixed(2)),
+      purchasesPercent: Number((selectedMonthlyRecord?.purchasesPercent ?? 0).toFixed(2)),
+      target: Number(toNumber(cmvTarget).toFixed(2)),
+    },
+  ];
+
+  const selectedReferenceLabel = formatMonthReferenceLabel(selectedReference);
   const printRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -1782,12 +1837,29 @@ function ReportsView({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-ink">Emissão de relatório</h3>
-            <p className="text-sm text-slate-500">Gere um PDF com gráficos, médias, comparativo e registros mensais.</p>
+            <p className="text-sm text-slate-500">Selecione o mês para gerar o relatório com os dados daquele período.</p>
           </div>
-          <button type="button" onClick={handleGeneratePdf} disabled={isGenerating} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70">
-            <FileDown size={16} />
-            {isGenerating ? "Gerando PDF..." : "Emitir PDF"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-sm text-slate-600">
+              Mês do relatório
+              <select
+                className="mt-1 w-48 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-brand-500"
+                value={selectedReference}
+                onChange={(event) => setSelectedReference(event.target.value)}
+              >
+                {!availableReferences.length && <option value="">Sem dados</option>}
+                {availableReferences.map((reference) => (
+                  <option key={reference} value={reference}>
+                    {formatMonthReferenceLabel(reference)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={handleGeneratePdf} disabled={isGenerating || !selectedReference} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70">
+              <FileDown size={16} />
+              {isGenerating ? "Gerando PDF..." : "Emitir PDF"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1796,12 +1868,12 @@ function ReportsView({
           <h3 className="text-lg font-semibold text-ink">Resumo mensal - Geral</h3>
           <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(monthlyAvg)}</strong></p>
           <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(monthlyLosses)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyRecords.length}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{selectedMonthlyRecords.length}</strong></p>
         </div>
         <div className="card-surface p-5">
           <h3 className="text-lg font-semibold text-ink">Análise de meta</h3>
           <p className="mt-3 text-sm text-slate-600">Meta atual: <strong>{formatPercent(cmvTarget)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Mensal acima da meta: <strong>{monthlyRecords.filter((record) => record.cmvPercent > cmvTarget).length}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Mensal acima da meta: <strong>{selectedMonthlyRecords.filter((record) => record.cmvPercent > cmvTarget).length}</strong></p>
         </div>
       </section>
 
@@ -1810,20 +1882,20 @@ function ReportsView({
           <h3 className="text-lg font-semibold text-ink">CMV mensal analítico - Bebidas</h3>
           <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(beveragesAvg)}</strong></p>
           <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(beveragesLosses)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyBeveragesRecords.length}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{selectedBeveragesRecords.length}</strong></p>
         </div>
         <div className="card-surface p-5">
           <h3 className="text-lg font-semibold text-ink">CMV mensal analítico - Alimentos</h3>
           <p className="mt-4 text-sm text-slate-600">Média de CMV %: <strong>{formatPercent(foodsAvg)}</strong></p>
           <p className="mt-2 text-sm text-slate-600">Perdas acumuladas: <strong>{formatCurrency(foodsLosses)}</strong></p>
-          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{monthlyFoodsRecords.length}</strong></p>
+          <p className="mt-2 text-sm text-slate-600">Registros: <strong>{selectedFoodsRecords.length}</strong></p>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Evolução do CMV mensal %">
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={chartMonthlyData}>
+            <LineChart data={selectedChartMonthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
               <XAxis dataKey="reference" />
               <YAxis domain={[0, 100]} unit="%" />
@@ -1834,7 +1906,7 @@ function ReportsView({
         </ChartCard>
         <ChartCard title="Comparação CMV %, Compras % e Meta">
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={comparisonData}>
+            <BarChart data={selectedComparisonData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
               <XAxis dataKey="metric" />
               <YAxis domain={[0, 100]} unit="%" />
@@ -1848,13 +1920,14 @@ function ReportsView({
         </ChartCard>
       </section>
 
-      <ReportRecordsTable title="Registros mensais detalhados" records={monthlyRecords} />
-      <ReportRecordsTable title="Registros mensais - Bebidas" records={monthlyBeveragesRecords} />
-      <ReportRecordsTable title="Registros mensais - Alimentos" records={monthlyFoodsRecords} />
+      <ReportRecordsTable title={`Registros mensais detalhados - ${selectedReferenceLabel}`} records={selectedMonthlyRecords} />
+      <ReportRecordsTable title={`Registros mensais - Bebidas (${selectedReferenceLabel})`} records={selectedBeveragesRecords} />
+      <ReportRecordsTable title={`Registros mensais - Alimentos (${selectedReferenceLabel})`} records={selectedFoodsRecords} />
 
       <div className="fixed -left-[99999px] top-0 w-[1180px] bg-white p-8 text-black" ref={printRef}>
         <h1 className="text-2xl font-semibold">Relatório CMV</h1>
         <p className="mt-1 text-sm">Data de emissão: {new Date().toLocaleDateString("pt-BR")}</p>
+        <p className="mt-1 text-sm">Mês de referência: {selectedReferenceLabel}</p>
         <section className="mt-6 grid grid-cols-2 gap-4">
           <div className="rounded-lg border border-slate-200 p-4">
             <h2 className="text-base font-semibold">Média de CMV mensal - Geral</h2>
@@ -1872,7 +1945,7 @@ function ReportsView({
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
           <h2 className="mb-3 text-base font-semibold">Evolução do CMV mensal %</h2>
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chartMonthlyData}>
+            <LineChart data={selectedChartMonthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
               <XAxis dataKey="reference" />
               <YAxis domain={[0, 100]} unit="%" />
@@ -1884,7 +1957,7 @@ function ReportsView({
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
           <h2 className="mb-3 text-base font-semibold">Comparação CMV %, Compras % e Meta</h2>
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={comparisonData}>
+            <BarChart data={selectedComparisonData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#dbe2ea" />
               <XAxis dataKey="metric" />
               <YAxis domain={[0, 100]} unit="%" />
@@ -1898,15 +1971,15 @@ function ReportsView({
         </section>
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
           <h2 className="text-base font-semibold">Registros do mês - Geral</h2>
-          <ReportRecordsStaticTable records={monthlyRecords} />
+          <ReportRecordsStaticTable records={selectedMonthlyRecords} />
         </section>
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
           <h2 className="text-base font-semibold">Registros do mês - Bebidas</h2>
-          <ReportRecordsStaticTable records={monthlyBeveragesRecords} />
+          <ReportRecordsStaticTable records={selectedBeveragesRecords} />
         </section>
         <section className="mt-6 rounded-lg border border-slate-200 p-4">
           <h2 className="text-base font-semibold">Registros do mês - Alimentos</h2>
-          <ReportRecordsStaticTable records={monthlyFoodsRecords} />
+          <ReportRecordsStaticTable records={selectedFoodsRecords} />
         </section>
       </div>
     </div>
