@@ -1159,23 +1159,30 @@ function EntryView({
   return (
     <>
       <section className="card-surface p-5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Voltar
-        </button>
-        <h2 className="text-xl font-semibold text-ink">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ink">{title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            Voltar
+          </button>
+        </div>
         {categoryTabs}
+      </section>
+
+      <section className="card-surface p-5">
         {notice && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {notice}
           </div>
         )}
 
-        <form className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" onSubmit={submit}>
+        <form className={`${notice ? "mt-4" : ""} grid gap-3 md:grid-cols-2 xl:grid-cols-3`} onSubmit={submit}>
           <InputField
             label={referenceType === "week" ? "Semana de referência" : "Mês de referência"}
             type={inputType}
