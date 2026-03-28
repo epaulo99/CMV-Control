@@ -332,7 +332,7 @@ app.get("/auth/google/login", async (_req, res, next) => {
     const url = oauthClient.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
-      scope: ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+      scope: ["openid", "email", "profile"],
     });
     res.redirect(url);
   } catch (error) {
@@ -346,7 +346,7 @@ app.get("/auth/reauth", async (_req, res, next) => {
     const url = oauthClient.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
-      scope: ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+      scope: ["openid", "email", "profile"],
     });
     res.redirect(url);
   } catch (error) {
